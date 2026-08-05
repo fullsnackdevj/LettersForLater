@@ -42,30 +42,35 @@ const LOCAL_USER_KEY = 'lettersforlater_user';
 const LOCAL_PAIR_KEY = 'lettersforlater_pair';
 const LOCAL_LETTERS_KEY = 'lettersforlater_letters';
 
-// Initial Demo Seed Letters (Set to empty for clean testing)
-const INITIAL_DEMO_LETTERS = [];
+// In-Memory Storage Cache backed by localStorage
+let inMemoryLettersStore = null;
 
-// Helper to load local storage letters
 function getLocalLetters() {
-  const data = localStorage.getItem(LOCAL_LETTERS_KEY);
-  if (!data) {
-    localStorage.setItem(LOCAL_LETTERS_KEY, JSON.stringify([]));
-    return [];
+  if (inMemoryLettersStore !== null) {
+    return inMemoryLettersStore;
   }
   try {
-    return JSON.parse(data);
+    const data = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_LETTERS_KEY) : null;
+    if (data) {
+      inMemoryLettersStore = JSON.parse(data);
+      return inMemoryLettersStore;
+    }
   } catch (e) {
-    return [];
+    console.warn('Error reading from localStorage:', e);
   }
-}
-
-// Clear cached demo letters on load
-if (typeof localStorage !== 'undefined') {
-  localStorage.setItem(LOCAL_LETTERS_KEY, JSON.stringify([]));
+  inMemoryLettersStore = [];
+  return inMemoryLettersStore;
 }
 
 function saveLocalLetters(letters) {
-  localStorage.setItem(LOCAL_LETTERS_KEY, JSON.stringify(letters));
+  inMemoryLettersStore = [...letters];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_LETTERS_KEY, JSON.stringify(letters));
+    }
+  } catch (e) {
+    console.warn('LocalStorage quota or write error (retained in memory):', e);
+  }
 }
 
 /**

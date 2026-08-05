@@ -3,7 +3,7 @@
  * Compress high-resolution images down to lightweight ~150KB - 250KB JPEG files
  * to guarantee 100% free Cloud Storage usage without exceeding limits.
  */
-export async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) {
+export async function compressImage(file, maxWidth = 900, maxHeight = 900, quality = 0.72) {
   return new Promise((resolve, reject) => {
     // If input is base64 string or already compressed data URL
     if (typeof file === 'string') {

@@ -32,18 +32,23 @@ export default function App() {
   // Active View Tab: 'vault' | 'timeline'
   const [activeTab, setActiveTab] = useState('vault');
 
-  // Modal States
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  // Modal States - Prioritize Google Auth Modal on app open if not signed in
+  const [isAuthOpen, setIsAuthOpen] = useState(!user);
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
-  // Subscribe to Auth State
+  // Subscribe to Auth State & auto-manage Auth Modal
   useEffect(() => {
     const unsubscribe = subscribeToAuth((usr) => {
       setUser(usr);
+      if (!usr) {
+        setIsAuthOpen(true);
+      } else {
+        setIsAuthOpen(false);
+      }
     });
     return () => unsubscribe();
   }, []);
