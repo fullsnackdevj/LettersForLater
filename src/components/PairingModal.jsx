@@ -18,7 +18,7 @@ export default function PairingModal({ isOpen, onClose, pairInfo, onSavePair }) 
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(inputCode || 'VALENTINE2026');
+    navigator.clipboard.writeText(inputCode || '#JayFinallyGotAKiss');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -28,7 +28,7 @@ export default function PairingModal({ isOpen, onClose, pairInfo, onSavePair }) 
     if (!inputCode.trim()) return;
     
     onSavePair({
-      code: inputCode.trim().toUpperCase(),
+      code: inputCode.trim(),
       targetUnlockDate: '2032-08-06T00:00:00+08:00',
       user2: { name: partnerName.trim() || 'Partner 💕' }
     });
@@ -69,16 +69,16 @@ export default function PairingModal({ isOpen, onClose, pairInfo, onSavePair }) 
           {/* Pair Code Input / Display */}
           <div>
             <label className="block text-xs font-bold text-[#4A3B2C] mb-1.5 uppercase tracking-wider">
-              Secret Pair Code (6 Digits / Letters)
+              Secret Pair Code / Hashtag
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={inputCode}
-                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                placeholder="e.g. LOVE32"
-                maxLength={12}
-                className="w-full bg-[#FAF6F0] border border-[#D2C3B0] rounded-xl px-4 py-2.5 font-mono text-center font-bold text-lg tracking-widest text-[#8B0000] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+                onChange={(e) => setInputCode(e.target.value)}
+                placeholder="e.g. #JayFinallyGotAKiss"
+                maxLength={30}
+                className="w-full bg-[#FAF6F0] border border-[#D2C3B0] rounded-xl px-4 py-2.5 font-mono text-center font-bold text-base tracking-wide text-[#8B0000] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
               />
               <button
                 type="button"

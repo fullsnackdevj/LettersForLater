@@ -103,7 +103,7 @@ export default function LetterEditorModal({
     try {
       await onSave({
         id: existingLetter?.id,
-        pairId: pairInfo?.code || 'VALENTINE2026',
+        pairId: pairInfo?.code || '#JayFinallyGotAKiss',
         authorId: currentUser?.uid || 'demo-user-1',
         authorName: currentUser?.displayName || 'Jay',
         authorPhoto: currentUser?.photoURL || '',

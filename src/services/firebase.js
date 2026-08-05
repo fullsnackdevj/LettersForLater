@@ -230,7 +230,7 @@ export async function saveLetterToCloud(letter) {
   const processedImages = await uploadImagesToStorage(letter.images, pairId, letterId);
 
   const letterDoc = {
-    pairId: letter.pairId || 'VALENTINE2026',
+    pairId: letter.pairId || '#JayFinallyGotAKiss',
     authorId: letter.authorId,
     authorName: letter.authorName,
     authorPhoto: letter.authorPhoto || '',

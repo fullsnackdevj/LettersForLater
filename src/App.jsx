@@ -23,7 +23,7 @@ import { getCountdownToTarget } from './utils/pht';
 export default function App() {
   const [user, setUser] = useState(null);
   const [pairInfo, setPairInfo] = useState({
-    code: 'VALENTINE2026',
+    code: '#JayFinallyGotAKiss',
     targetUnlockDate: '2032-08-06T00:00:00+08:00',
     user2: { name: 'Partner 💕' }
   });
@@ -62,7 +62,7 @@ export default function App() {
 
   // Subscribe to Realtime Letters
   useEffect(() => {
-    const pairCode = pairInfo?.code || 'VALENTINE2026';
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const currentUserId = user?.uid || 'demo-user-1';
 
     const unsubscribe = subscribeToLetters(pairCode, currentUserId, (fetchedLetters) => {
