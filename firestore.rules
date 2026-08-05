@@ -2,22 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user profile
+    // Users can read and write their user profile
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null;
     }
 
-    // Pairs: authenticated users can create pairs, members can read/update
+    // Pairs info (reading & writing pairs)
     match /pairs/{pairId} {
-      allow create: if request.auth != null;
-      allow read, update: if request.auth != null 
-        && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+      allow read, write: if request.auth != null;
     }
 
-    // Letters: only pair members can read/write letters
-    match /pairs/{pairId}/letters/{letterId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null;
+    // Letters collection
+    match /letters/{letterId} {
+      allow read, write, delete: if request.auth != null;
     }
   }
 }
