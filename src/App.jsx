@@ -186,6 +186,7 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onSignInGoogle={() => signInWithGoogle()}
+        canClose={!!user}
       />
 
       <PairingModal

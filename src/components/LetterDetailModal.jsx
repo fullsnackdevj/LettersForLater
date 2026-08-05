@@ -127,12 +127,12 @@ export default function LetterDetailModal({
                 {letter.images.map((img, i) => (
                   <div
                     key={i}
-                    onClick={() => setActivePhoto(img.dataUrl)}
+                    onClick={() => setActivePhoto(img.storageUrl || img.dataUrl)}
                     className="polaroid-card cursor-pointer group p-2"
                   >
                     <div className="relative overflow-hidden rounded">
                       <img
-                        src={img.dataUrl}
+                        src={img.storageUrl || img.dataUrl}
                         alt={img.name}
                         className="w-full h-36 object-cover transition-transform group-hover:scale-105"
                       />

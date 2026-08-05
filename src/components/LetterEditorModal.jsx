@@ -263,7 +263,7 @@ export default function LetterEditorModal({
                 {images.map((img, idx) => (
                   <div key={idx} className="relative polaroid-card p-1.5 group">
                     <img
-                      src={img.dataUrl}
+                      src={img.dataUrl || img.storageUrl}
                       alt={img.name}
                       className="w-full h-24 object-cover rounded"
                     />

@@ -1,0 +1,24 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "LettersForLater",
+        "supportEmail": "jayfullsnackdev@gmail.com"
+      }
+    },
+    "authorizedDomains": [
+      "localhost",
+      "letters-for-later-app.firebaseapp.com",
+      "letters-for-later-app.web.app",
+      "letter4later.netlify.app"
+    ]
+  },
+  "firestore": {
+    "database": "(default)",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

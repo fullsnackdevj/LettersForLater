@@ -136,7 +136,7 @@ export default function LetterCard({
             {letter.images.slice(0, 3).map((img, i) => (
               <img
                 key={i}
-                src={img.dataUrl}
+                src={img.storageUrl || img.dataUrl}
                 alt={`Photo ${i+1}`}
                 className="w-12 h-12 object-cover rounded border border-[#E2D7C7] shrink-0"
               />

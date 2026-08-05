@@ -12,8 +12,10 @@ import {
   query, 
   where, 
   onSnapshot,
-  serverTimestamp 
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
 
 // Firebase configuration (Loaded from import.meta.env or fallback)
@@ -28,12 +30,13 @@ const firebaseConfig = {
 
 const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
-let app, auth, db, googleProvider;
+let app, auth, db, storage, googleProvider;
 
 if (isFirebaseConfigured) {
   app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
   googleProvider = new GoogleAuthProvider();
 }
 
@@ -74,6 +77,51 @@ function saveLocalLetters(letters) {
 }
 
 /**
+ * Upload images to Firebase Storage and return download URLs
+ * This prevents exceeding Firestore's 1MB document size limit
+ */
+async function uploadImagesToStorage(images, pairId, letterId) {
+  if (!isFirebaseConfigured || !storage || !images?.length) return [];
+
+  const uploadedImages = [];
+
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+
+    // If image already has a storageUrl (previously uploaded), keep it
+    if (img.storageUrl) {
+      uploadedImages.push(img);
+      continue;
+    }
+
+    // Upload base64 data URL to Firebase Storage
+    if (img.dataUrl) {
+      try {
+        const fileName = `${letterId}_${i}_${Date.now()}.jpg`;
+        const storageRef = ref(storage, `letters/${pairId}/${fileName}`);
+        
+        await uploadString(storageRef, img.dataUrl, 'data_url');
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        uploadedImages.push({
+          storageUrl: downloadUrl,
+          name: img.name || `photo_${i + 1}.jpg`,
+          sizeKb: img.sizeKb || 0,
+          width: img.width || 0,
+          height: img.height || 0
+        });
+      } catch (err) {
+        console.error(`Error uploading image ${i}:`, err);
+        // Keep as dataUrl fallback if upload fails (local mode)
+        uploadedImages.push(img);
+      }
+    }
+  }
+
+  return uploadedImages;
+}
+
+/**
  * Authentication Service
  */
 export async function signInWithGoogle() {
@@ -87,11 +135,12 @@ export async function signInWithGoogle() {
         photoURL: result.user.photoURL
       };
     } catch (err) {
-      console.warn('Firebase login error, using local auth demo:', err);
+      console.error('Firebase Google Sign-In error:', err);
+      throw err; // Don't silently fall to demo - let caller handle
     }
   }
 
-  // Demo Fallback User
+  // Demo Fallback User (only when Firebase is not configured)
   const demoUser = {
     uid: 'demo-user-1',
     displayName: 'Jay (Demo User)',
@@ -120,8 +169,7 @@ export function subscribeToAuth(callback) {
           photoURL: user.photoURL
         });
       } else {
-        const local = localStorage.getItem(LOCAL_USER_KEY);
-        callback(local ? JSON.parse(local) : null);
+        callback(null);
       }
     });
   }
@@ -151,14 +199,7 @@ export async function getPairInfo(pairCode) {
     if (parsed.code === pairCode.toUpperCase()) return parsed;
   }
   
-  // Default demo pair
-  return {
-    code: 'VALENTINE2026',
-    user1: { uid: 'demo-user-1', name: 'Jay' },
-    user2: { uid: 'demo-user-2', name: 'Partner 💕' },
-    targetUnlockDate: '2032-08-06T00:00:00+08:00',
-    createdAt: new Date().toISOString()
-  };
+  return null;
 }
 
 export async function savePairInfo(pairData) {
@@ -181,6 +222,13 @@ export async function saveLetterToCloud(letter) {
   
   // If letter already exists (editing draft or letter text)
   const isNew = !letter.id;
+  const tempId = `letter-${Date.now()}`;
+
+  // Upload images to Storage first (replaces base64 dataUrls with download URLs)
+  const pairId = letter.pairId || 'default';
+  const letterId = letter.id || tempId;
+  const processedImages = await uploadImagesToStorage(letter.images, pairId, letterId);
+
   const letterDoc = {
     pairId: letter.pairId || 'VALENTINE2026',
     authorId: letter.authorId,
@@ -191,7 +239,13 @@ export async function saveLetterToCloud(letter) {
     isVeryImportant: Boolean(letter.isVeryImportant),
     importantTagReason: letter.importantTagReason || '',
     mood: letter.mood || '💌 Warm & Hopeful',
-    images: letter.images || [],
+    images: processedImages.map(img => ({
+      storageUrl: img.storageUrl || '',
+      name: img.name || '',
+      sizeKb: img.sizeKb || 0,
+      width: img.width || 0,
+      height: img.height || 0
+    })),
     isDraft: Boolean(letter.isDraft),
     // IMMUTABLE PHT Creation Timestamp (Preserved if editing)
     createdAtPHT: letter.createdAtPHT || pht.fullString,
@@ -213,7 +267,7 @@ export async function saveLetterToCloud(letter) {
 
   // Local Storage fallback
   const localLetters = getLocalLetters();
-  const newId = letter.id || `letter-${Date.now()}`;
+  const newId = letter.id || tempId;
   const updatedLetter = { id: newId, ...letterDoc };
 
   const existingIdx = localLetters.findIndex(l => l.id === newId);
@@ -233,6 +287,19 @@ export async function deleteLetterFromCloud(letterId) {
   }
   const localLetters = getLocalLetters().filter(l => l.id !== letterId);
   saveLocalLetters(localLetters);
+}
+
+export async function deleteAllLetters() {
+  if (isFirebaseConfigured && db) {
+    const q = query(collection(db, 'letters'));
+    const snapshot = await getDocs(q);
+    const deletePromises = [];
+    snapshot.forEach(docSnap => {
+      deletePromises.push(deleteDoc(doc(db, 'letters', docSnap.id)));
+    });
+    await Promise.all(deletePromises);
+  }
+  saveLocalLetters([]);
 }
 
 export function subscribeToLetters(pairId, currentUserId, callback) {

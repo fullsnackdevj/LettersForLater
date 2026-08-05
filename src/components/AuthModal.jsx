@@ -1,8 +1,31 @@
-import React from 'react';
-import { Mail, ShieldCheck, Heart, Sparkles, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, ShieldCheck, Heart, Sparkles, X, AlertCircle } from 'lucide-react';
 
-export default function AuthModal({ isOpen, onClose, onSignInGoogle }) {
+export default function AuthModal({ isOpen, onClose, onSignInGoogle, canClose = false }) {
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState('');
+
   if (!isOpen) return null;
+
+  const handleSignIn = async () => {
+    setIsSigningIn(true);
+    setError('');
+    try {
+      await onSignInGoogle();
+      onClose();
+    } catch (err) {
+      console.error('Sign-in error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled. Please try again.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized. Please contact the app admin.');
+      } else {
+        setError(err.message || 'Sign-in failed. Please try again.');
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#36271C]/60 backdrop-blur-sm animate-fadeIn">
@@ -13,13 +36,15 @@ export default function AuthModal({ isOpen, onClose, onSignInGoogle }) {
         {/* Decorative Tape */}
         <div className="tape-strip"></div>
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-[#9E8B75] hover:text-[#36271C] p-1 rounded-full hover:bg-[#EFE9DE] transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Close Button - Only shown if user is already authenticated */}
+        {canClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-[#9E8B75] hover:text-[#36271C] p-1 rounded-full hover:bg-[#EFE9DE] transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Header Icon */}
         <div className="flex justify-center mb-4">
@@ -53,13 +78,19 @@ export default function AuthModal({ isOpen, onClose, onSignInGoogle }) {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-xs text-rose-700 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* Google Sign In Button - High Priority Main CTA */}
         <button
-          onClick={async () => {
-            await onSignInGoogle();
-            onClose();
-          }}
-          className="w-full flex items-center justify-center gap-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] font-bold text-base py-4 px-6 rounded-xl shadow-xl transition-all transform hover:-translate-y-1 hover:shadow-2xl border border-[#D4AF37]/60 group cursor-pointer"
+          onClick={handleSignIn}
+          disabled={isSigningIn}
+          className="w-full flex items-center justify-center gap-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] font-bold text-base py-4 px-6 rounded-xl shadow-xl transition-all transform hover:-translate-y-1 hover:shadow-2xl border border-[#D4AF37]/60 group cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
         >
           {/* White container for Google logo for clean contrast */}
           <div className="bg-white p-1.5 rounded-full shadow-sm group-hover:scale-110 transition-transform">
@@ -82,7 +113,9 @@ export default function AuthModal({ isOpen, onClose, onSignInGoogle }) {
               />
             </svg>
           </div>
-          <span className="tracking-wide">Sign In with Google</span>
+          <span className="tracking-wide">
+            {isSigningIn ? 'Signing In...' : 'Sign In with Google'}
+          </span>
         </button>
 
         <p className="text-[11px] text-center text-[#9E8B75] mt-4">
