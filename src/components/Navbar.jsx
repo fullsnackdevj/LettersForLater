@@ -54,7 +54,10 @@ export default function Navbar({
             <Lock className="w-3.5 h-3.5 text-[#D4AF37] animate-lock-pulse" />
             <span>
               {countdown.isUnlocked ? (
-                <span className="text-emerald-700 font-bold">✨ Vault Unlocked!</span>
+                <span className="text-emerald-700 font-bold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  Vault Unlocked!
+                </span>
               ) : (
                 <span>
                   Unlock in <strong className="font-mono text-sm text-[#4A1010]">{countdown.years}y {countdown.days}d {countdown.hours}h {countdown.minutes}m</strong> (2032)

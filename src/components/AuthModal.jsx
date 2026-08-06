@@ -48,8 +48,8 @@ export default function AuthModal({ isOpen, onClose, onSignInGoogle, canClose = 
 
         {/* Header Icon */}
         <div className="flex justify-center mb-4">
-          <div className="wax-seal w-16 h-16 text-3xl font-serif">
-            💌
+          <div className="wax-seal w-16 h-16">
+            <Mail className="w-8 h-8 text-[#F8E3B6]" />
           </div>
         </div>
 

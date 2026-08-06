@@ -175,8 +175,9 @@ export default function LetterDetailModal({
               alt="Full Polaroid View"
               className="max-w-full max-h-[80vh] object-contain rounded"
             />
-            <p className="text-center font-handwriting text-xl text-[#36271C] mt-2">
-              Memory Snapshot 💕
+            <p className="text-center font-handwriting text-xl text-[#36271C] mt-2 flex items-center justify-center gap-1.5">
+              <span>Memory Snapshot</span>
+              <Heart className="w-4 h-4 text-rose-500 fill-current" />
             </p>
           </div>
         </div>

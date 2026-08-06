@@ -10,7 +10,10 @@ import {
   Clock, 
   Heart, 
   Key,
-  ShieldCheck
+  ShieldCheck,
+  Mail,
+  PenTool,
+  Inbox
 } from 'lucide-react';
 import LetterCard from './LetterCard';
 import { getCountdownToTarget } from '../utils/pht';
@@ -54,8 +57,8 @@ export default function VaultView({
       <div className="relative bg-gradient-to-br from-[#4A1010] via-[#6E1A1A] to-[#36271C] text-[#F8E3B6] rounded-3xl p-6 sm:p-10 shadow-2xl overflow-hidden border-2 border-[#D4AF37]/40">
         
         {/* Background Decorative Seals & Ribbons */}
-        <div className="absolute right-[-40px] top-[-40px] opacity-10 text-[180px] font-serif pointer-events-none select-none">
-          💌
+        <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none select-none">
+          <Mail className="w-48 h-48 text-[#F3E5AB]" />
         </div>
 
         <div className="relative z-10 max-w-3xl space-y-4">
@@ -111,8 +114,8 @@ export default function VaultView({
         
         {/* User Letter Count Card */}
         <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-5 rounded-2xl shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#A83232] text-xl font-bold font-serif shrink-0">
-            ✍️
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#A83232] shrink-0">
+            <PenTool className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs text-[#9E8B75] uppercase font-bold tracking-wider">Your Sealed Letters</p>
@@ -124,8 +127,8 @@ export default function VaultView({
 
         {/* Partner Letter Count Card */}
         <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-5 rounded-2xl shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 text-xl font-bold font-serif shrink-0">
-            🔒
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 shrink-0">
+            <Lock className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs text-[#9E8B75] uppercase font-bold tracking-wider">
@@ -224,8 +227,8 @@ export default function VaultView({
         </div>
       ) : (
         <div className="bg-[#FDFBF7] border-2 border-dashed border-[#D2C3B0] rounded-3xl p-12 text-center space-y-4">
-          <div className="wax-seal w-16 h-16 text-3xl font-serif mx-auto">
-            📮
+          <div className="wax-seal w-16 h-16 mx-auto">
+            <Inbox className="w-8 h-8 text-[#F8E3B6]" />
           </div>
           <h3 className="text-xl font-bold font-serif-vintage text-[#36271C]">
             No letters found in this view

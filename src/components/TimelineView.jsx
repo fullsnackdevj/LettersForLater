@@ -27,8 +27,8 @@ export default function TimelineView({ letters, currentUser, onViewLetter }) {
       {/* Celebration Unlocked Banner */}
       <div className="bg-gradient-to-r from-[#D4AF37] via-[#AA7C11] to-[#C86D51] text-[#3D2600] rounded-3xl p-8 sm:p-12 shadow-2xl text-center space-y-3 relative overflow-hidden">
         
-        <div className="wax-seal w-16 h-16 text-3xl font-serif mx-auto shadow-xl">
-          ✨
+        <div className="wax-seal w-16 h-16 mx-auto shadow-xl">
+          <Sparkles className="w-8 h-8 text-[#F8E3B6]" />
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-bold font-serif-vintage tracking-tight">
@@ -46,7 +46,7 @@ export default function TimelineView({ letters, currentUser, onViewLetter }) {
       </div>
 
       {/* Vertical Scrapbook Timeline */}
-      <div className="relative border-l-2 border-[#D2C3B0] ml-4 sm:ml-8 pl-6 sm:pl-10 space-y-10">
+      <div className="relative border-l-2 border-[#D2C3B0] ml-3 sm:ml-8 pl-4 sm:pl-10 space-y-10">
         
         {sortedLetters.map((letter, idx) => {
           const isOwner = letter.authorId === (currentUser?.uid || 'demo-user-1');
@@ -55,7 +55,7 @@ export default function TimelineView({ letters, currentUser, onViewLetter }) {
             <div key={letter.id} className="relative group">
               
               {/* Timeline Stamp Node */}
-              <div className="absolute -left-[35px] sm:-left-[51px] top-4 w-8 h-8 rounded-full bg-[#FAF5EC] border-2 border-[#A83232] flex items-center justify-center text-xs font-bold text-[#A83232] shadow-md">
+              <div className="absolute -left-[27px] sm:-left-[51px] top-4 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FAF5EC] border-2 border-[#A83232] flex items-center justify-center text-xs font-bold text-[#A83232] shadow-md">
                 {idx + 1}
               </div>
 

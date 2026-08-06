@@ -19,13 +19,13 @@ export default function LetterCard({
 
         {/* Sealed Wax Stamp */}
         <div className="flex justify-center mb-3">
-          <div className="wax-seal w-12 h-12 text-xl font-serif animate-lock-pulse">
-            🔒
+          <div className="wax-seal w-12 h-12 animate-lock-pulse">
+            <Lock className="w-6 h-6 text-[#F8E3B6]" />
           </div>
         </div>
 
         <h3 className="font-serif-vintage font-bold text-lg text-[#36271C] mb-1">
-          Sealed Letter from {letter.authorName || 'Partner 💕'}
+          Sealed Letter from {letter.authorName || 'Partner'}
         </h3>
         
         <p className="text-xs text-[#9E8B75] font-handwriting text-base mb-3">

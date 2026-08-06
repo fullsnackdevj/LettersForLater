@@ -11,18 +11,24 @@ import {
   FileText,
   Lock,
   Save,
-  CheckCircle2
+  PenTool,
+  Zap,
+  Heart,
+  CloudRain,
+  Sun,
+  Moon,
+  PartyPopper
 } from 'lucide-react';
 import { getCurrentPHT } from '../utils/pht';
 import { compressImages } from '../utils/imageCompressor';
 
 const MOOD_OPTIONS = [
-  '💌 Warm & Hopeful',
-  '🌧️ Cozily Peaceful',
-  '☕ Morning Sunshine',
-  '🌙 Late Night Thoughts',
-  '💖 Deeply Grateful',
-  '🎉 Celebrating Us'
+  'Warm & Hopeful',
+  'Cozily Peaceful',
+  'Morning Sunshine',
+  'Late Night Thoughts',
+  'Deeply Grateful',
+  'Celebrating Us'
 ];
 
 export default function LetterEditorModal({ 
@@ -37,7 +43,7 @@ export default function LetterEditorModal({
   const [content, setContent] = useState('');
   const [isVeryImportant, setIsVeryImportant] = useState(false);
   const [importantTagReason, setImportantTagReason] = useState('');
-  const [mood, setMood] = useState('💌 Warm & Hopeful');
+  const [mood, setMood] = useState('Warm & Hopeful');
   const [images, setImages] = useState([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,7 +58,7 @@ export default function LetterEditorModal({
       setContent(existingLetter.content || '');
       setIsVeryImportant(Boolean(existingLetter.isVeryImportant));
       setImportantTagReason(existingLetter.importantTagReason || '');
-      setMood(existingLetter.mood || '💌 Warm & Hopeful');
+      setMood(existingLetter.mood || 'Warm & Hopeful');
       setImages(existingLetter.images || []);
       setIsDraft(Boolean(existingLetter.isDraft));
       // Preserve original immutable PHT timestamp
@@ -65,7 +71,7 @@ export default function LetterEditorModal({
       setContent('');
       setIsVeryImportant(false);
       setImportantTagReason('');
-      setMood('💌 Warm & Hopeful');
+      setMood('Warm & Hopeful');
       setImages([]);
       setIsDraft(false);
     }
@@ -137,7 +143,9 @@ export default function LetterEditorModal({
         {/* Modal Top Bar */}
         <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-6 py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="wax-seal w-8 h-8 text-sm">✍️</div>
+            <div className="wax-seal w-8 h-8">
+              <PenTool className="w-4 h-4 text-[#F8E3B6]" />
+            </div>
             <div>
               <h2 className="text-lg font-bold font-serif-vintage text-[#36271C]">
                 {existingLetter ? 'Edit Your Sealed Letter' : 'Compose Letter for Later'}
@@ -252,8 +260,9 @@ export default function LetterEditorModal({
               </div>
 
               {/* Compressed Badge */}
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
-                ⚡ Auto-Compressed (100% Free Storage)
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <Zap className="w-3 h-3 text-emerald-600" />
+                Auto-Compressed (100% Free Storage)
               </span>
             </div>
 

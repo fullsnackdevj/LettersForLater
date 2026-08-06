@@ -30,7 +30,7 @@ export default function PairingModal({ isOpen, onClose, pairInfo, onSavePair }) 
     onSavePair({
       code: inputCode.trim(),
       targetUnlockDate: '2032-08-06T00:00:00+08:00',
-      user2: { name: partnerName.trim() || 'Partner 💕' }
+      user2: { name: partnerName.trim() || 'Partner' }
     });
     onClose();
   };

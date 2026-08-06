@@ -238,7 +238,7 @@ export async function saveLetterToCloud(letter) {
     content: letter.content || '',
     isVeryImportant: Boolean(letter.isVeryImportant),
     importantTagReason: letter.importantTagReason || '',
-    mood: letter.mood || '💌 Warm & Hopeful',
+    mood: letter.mood || 'Warm & Hopeful',
     images: processedImages.map(img => ({
       storageUrl: img.storageUrl || '',
       name: img.name || '',

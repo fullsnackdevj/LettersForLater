@@ -7,6 +7,7 @@ import PairingModal from './components/PairingModal';
 import LetterEditorModal from './components/LetterEditorModal';
 import LetterDetailModal from './components/LetterDetailModal';
 import UnlockTimelineModal from './components/UnlockTimelineModal';
+import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
   signInWithGoogle, 
@@ -26,7 +27,7 @@ export default function App() {
   const [pairInfo, setPairInfo] = useState({
     code: '#JayFinallyGotAKiss',
     targetUnlockDate: '2032-08-06T00:00:00+08:00',
-    user2: { name: 'Partner 💕' }
+    user2: { name: 'Partner' }
   });
   const [letters, setLetters] = useState([]);
 
@@ -131,16 +132,17 @@ export default function App() {
       />
 
       {/* View Switcher Bar (Vault vs Timeline) */}
-      <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-4 py-2 flex justify-center gap-3">
+      <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-3 py-2 flex flex-wrap justify-center gap-2 max-w-full overflow-x-auto">
         <button
           onClick={() => setActiveTab('vault')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
             activeTab === 'vault'
               ? 'bg-[#A83232] text-[#F8E3B6] shadow-sm'
               : 'text-[#4A3B2C] hover:bg-[#EFE9DE]'
           }`}
         >
-          🔒 Time Capsule Vault
+          <Lock className="w-3.5 h-3.5" />
+          <span>Time Capsule Vault</span>
         </button>
 
         <button
@@ -155,11 +157,20 @@ export default function App() {
           }`}
         >
           {!countdown.isUnlocked ? (
-            <>🔒 Locked Until The Right Time</>
+            <>
+              <Lock className="w-3.5 h-3.5" />
+              <span>Locked Until The Right Time</span>
+            </>
           ) : hasMatchingUnlockCodes() ? (
-            <>✨ Unlocked Timeline</>
+            <>
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Unlocked Timeline</span>
+            </>
           ) : (
-            <>🔑 Unlock 2032 Timeline</>
+            <>
+              <Key className="w-3.5 h-3.5" />
+              <span>Unlock 2032 Timeline</span>
+            </>
           )}
         </button>
       </div>
