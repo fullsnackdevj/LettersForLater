@@ -155,7 +155,7 @@ export default function App() {
           }`}
         >
           {!countdown.isUnlocked ? (
-            <>🔒 Locked until 2032</>
+            <>🔒 Locked Until The Right Time</>
           ) : hasMatchingUnlockCodes() ? (
             <>✨ Unlocked Timeline</>
           ) : (
