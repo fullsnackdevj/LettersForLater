@@ -6,6 +6,7 @@ import AuthModal from './components/AuthModal';
 import PairingModal from './components/PairingModal';
 import LetterEditorModal from './components/LetterEditorModal';
 import LetterDetailModal from './components/LetterDetailModal';
+import UnlockTimelineModal from './components/UnlockTimelineModal';
 
 import { 
   signInWithGoogle, 
@@ -37,6 +38,7 @@ export default function App() {
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isUnlockTimelineOpen, setIsUnlockTimelineOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -98,6 +100,24 @@ export default function App() {
     setPairInfo(updated);
   };
 
+  const hasMatchingUnlockCodes = () => {
+    const unlockCodes = pairInfo?.unlockCodes || {};
+    const values = Object.values(unlockCodes);
+    return values.length >= 2 && values.every(v => v === values[0]);
+  };
+
+  const handleTimelineButtonClick = () => {
+    if (!countdown.isUnlocked) {
+      return; // Disabled before 2032
+    }
+    
+    if (hasMatchingUnlockCodes()) {
+      setActiveTab('timeline');
+    } else {
+      setIsUnlockTimelineOpen(true);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-sans">
       
@@ -124,14 +144,23 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('timeline')}
+          onClick={handleTimelineButtonClick}
+          disabled={!countdown.isUnlocked}
           className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
             activeTab === 'timeline'
               ? 'bg-[#D4AF37] text-[#3D2600] shadow-sm'
-              : 'text-[#4A3B2C] hover:bg-[#EFE9DE]'
+              : !countdown.isUnlocked 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-70'
+                : 'text-[#4A3B2C] hover:bg-[#EFE9DE]'
           }`}
         >
-          ✨ {countdown.isUnlocked ? 'Unlocked Timeline' : 'Preview 2032 Timeline'}
+          {!countdown.isUnlocked ? (
+            <>🔒 Locked until 2032</>
+          ) : hasMatchingUnlockCodes() ? (
+            <>✨ Unlocked Timeline</>
+          ) : (
+            <>🔑 Unlock 2032 Timeline</>
+          )}
         </button>
       </div>
 
@@ -222,6 +251,35 @@ export default function App() {
           setIsEditorOpen(true);
         }}
         onDelete={handleDeleteLetter}
+      />
+
+      <UnlockTimelineModal
+        isOpen={isUnlockTimelineOpen}
+        onClose={() => setIsUnlockTimelineOpen(false)}
+        pairInfo={pairInfo}
+        currentUser={user}
+        onSaveUnlockCode={(code) => {
+          const currentUserId = user?.uid || 'demo-user-1';
+          const newUnlockCodes = { ...(pairInfo.unlockCodes || {}) };
+          
+          if (code === null) {
+            delete newUnlockCodes[currentUserId];
+          } else {
+            newUnlockCodes[currentUserId] = code;
+          }
+          
+          handleSavePairInfo({
+            ...pairInfo,
+            unlockCodes: newUnlockCodes
+          });
+          
+          // Check if this newly entered code completes the match
+          const updatedValues = Object.values(newUnlockCodes);
+          if (updatedValues.length >= 2 && updatedValues.every(v => v === updatedValues[0])) {
+            setIsUnlockTimelineOpen(false);
+            setActiveTab('timeline');
+          }
+        }}
       />
 
     </div>
