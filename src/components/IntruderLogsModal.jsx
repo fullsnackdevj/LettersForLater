@@ -1,8 +1,18 @@
 import React from 'react';
-import { X, ShieldAlert, Trash2, Clock, Camera } from 'lucide-react';
+import { X, ShieldAlert, Trash2, Clock, Camera, Download } from 'lucide-react';
 
 export default function IntruderLogsModal({ isOpen, onClose, intruderLogs, onDeleteLog }) {
   if (!isOpen) return null;
+
+  const handleDownloadPhoto = (photoUrl, timestamp) => {
+    if (!photoUrl) return;
+    const link = document.createElement('a');
+    link.href = photoUrl;
+    link.download = `intruder_snapshot_${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#36271C]/75 backdrop-blur-sm animate-fadeIn">
@@ -70,13 +80,25 @@ export default function IntruderLogsModal({ isOpen, onClose, intruderLogs, onDel
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => onDeleteLog(log.id)}
-                    className="inline-flex items-center gap-1.5 text-xs text-rose-700 hover:text-rose-900 font-bold hover:underline pt-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Snapshot Log</span>
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1">
+                    {log.photoDataUrl && (
+                      <button
+                        onClick={() => handleDownloadPhoto(log.photoDataUrl, log.timestampPHT)}
+                        className="inline-flex items-center gap-1.5 text-xs text-emerald-800 hover:text-emerald-950 font-bold bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-lg shadow-sm transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Save to Phone Gallery 📥</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => onDeleteLog(log.id)}
+                      className="inline-flex items-center gap-1.5 text-xs text-rose-700 hover:text-rose-900 font-bold hover:underline"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Log</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -103,3 +125,4 @@ export default function IntruderLogsModal({ isOpen, onClose, intruderLogs, onDel
     </div>
   );
 }
+

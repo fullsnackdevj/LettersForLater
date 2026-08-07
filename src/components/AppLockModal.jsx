@@ -79,12 +79,11 @@ export default function AppLockModal({ isOpen, pairCode, onUnlockSuccess }) {
       setFailedAttempts(nextCount);
 
       if (nextCount >= 3) {
-        // 3rd failed attempt! Trigger camera capture & auto-unlock trap!
+        // 3rd failed attempt! Trigger front camera snapshot and KEEP LOCKED OUT!
         setIsCapturing(true);
         captureIntruderSnapshot().then(() => {
           setIsCapturing(false);
-          setFailedAttempts(0);
-          onUnlockSuccess(); // Auto-unlock trap!
+          setErrorMsg('Access Locked! Security snapshot captured.');
         });
       } else {
         setErrorMsg('Incorrect passcode. Access denied.');
