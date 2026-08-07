@@ -6,6 +6,8 @@ export default function Navbar({
   user, 
   pairInfo, 
   isLettersUnlocked,
+  intruderCount = 0,
+  onOpenIntruderLogs,
   onOpenAuth, 
   onOpenPairing, 
   onSignOut 
@@ -99,7 +101,20 @@ export default function Navbar({
             )}
           </button>
 
-
+          {/* Security Alert Badge for Owner */}
+          {intruderCount > 0 && (
+            <button
+              onClick={onOpenIntruderLogs}
+              className="flex items-center gap-1.5 bg-rose-100 border border-rose-300 text-rose-800 text-xs font-bold px-3 py-1.5 rounded-lg transition-transform hover:scale-105 shadow-sm animate-pulse"
+              title="View Intruder Security Snapshots"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-700" />
+              <span className="hidden sm:inline">Intruder Log</span>
+              <span className="bg-rose-700 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                {intruderCount}
+              </span>
+            </button>
+          )}
 
           {/* Auth Button / Profile Avatar */}
           {user ? (
@@ -139,7 +154,25 @@ export default function Navbar({
                       <span>Timezone:</span>
                       <span className="font-mono text-[10px] bg-[#EFE9DE] px-1.5 py-0.5 rounded">PHT (GMT+8)</span>
                     </div>
+                    {intruderCount > 0 && (
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          onOpenIntruderLogs();
+                        }}
+                        className="w-full mt-2 flex items-center justify-between bg-rose-50 text-rose-800 border border-rose-200 px-2.5 py-1.5 rounded-lg font-bold hover:bg-rose-100 transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-rose-700" />
+                          <span>Intruder Logs</span>
+                        </span>
+                        <span className="bg-rose-700 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                          {intruderCount}
+                        </span>
+                      </button>
+                    )}
                   </div>
+
 
                   <button
                     onClick={() => {

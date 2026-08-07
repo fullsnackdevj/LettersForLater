@@ -349,3 +349,87 @@ export function subscribeToLetters(pairId, currentUserId, callback) {
   callback(getLocalLetters());
   return () => clearInterval(pollInterval);
 }
+
+/**
+ * Intruder Snapshots & Security Alert Service
+ */
+const LOCAL_INTRUDER_KEY = 'lettersforlater_intruders';
+
+function getLocalIntruders() {
+  try {
+    const data = localStorage.getItem(LOCAL_INTRUDER_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalIntruders(list) {
+  try {
+    localStorage.setItem(LOCAL_INTRUDER_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('LocalStorage error saving intruder logs:', e);
+  }
+}
+
+export async function saveIntruderLog(logData) {
+  const pht = getCurrentPHT();
+  const logItem = {
+    pairId: logData.pairId || '#JayFinallyGotAKiss',
+    photoDataUrl: logData.photoDataUrl || '',
+    timestampPHT: pht.fullString,
+    createdAtIso: pht.isoString,
+    attemptCount: logData.attemptCount || 3
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const docRef = await addDoc(collection(db, 'intruder_logs'), {
+        ...logItem,
+        serverTime: serverTimestamp()
+      });
+      logItem.id = docRef.id;
+    } catch (e) {
+      console.error('Error saving intruder log to Firestore:', e);
+    }
+  }
+
+  const localList = getLocalIntruders();
+  const itemWithId = { id: logItem.id || `intruder-${Date.now()}`, ...logItem };
+  localList.unshift(itemWithId);
+  saveLocalIntruders(localList);
+  return itemWithId;
+}
+
+export function subscribeToIntruderLogs(pairId, callback) {
+  if (isFirebaseConfigured && db) {
+    const q = query(collection(db, 'intruder_logs'), where('pairId', '==', pairId));
+    return onSnapshot(q, (snapshot) => {
+      const logs = [];
+      snapshot.forEach(docSnap => {
+        logs.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(logs);
+    });
+  }
+
+  const pollInterval = setInterval(() => {
+    callback(getLocalIntruders());
+  }, 1000);
+
+  callback(getLocalIntruders());
+  return () => clearInterval(pollInterval);
+}
+
+export async function deleteIntruderLog(logId) {
+  if (isFirebaseConfigured && db) {
+    try {
+      await deleteDoc(doc(db, 'intruder_logs', logId));
+    } catch (e) {
+      console.error('Error deleting intruder log:', e);
+    }
+  }
+  const filtered = getLocalIntruders().filter(l => l.id !== logId);
+  saveLocalIntruders(filtered);
+}
+

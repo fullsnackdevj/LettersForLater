@@ -8,6 +8,7 @@ import LetterEditorModal from './components/LetterEditorModal';
 import LetterDetailModal from './components/LetterDetailModal';
 import UnlockTimelineModal from './components/UnlockTimelineModal';
 import AppLockModal from './components/AppLockModal';
+import IntruderLogsModal from './components/IntruderLogsModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -19,7 +20,9 @@ import {
   saveLetterToCloud, 
   deleteLetterFromCloud, 
   subscribeToLetters,
-  subscribeToPairInfo
+  subscribeToPairInfo,
+  subscribeToIntruderLogs,
+  deleteIntruderLog
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -32,6 +35,7 @@ export default function App() {
     user2: { name: 'Partner' }
   });
   const [letters, setLetters] = useState([]);
+  const [intruderLogs, setIntruderLogs] = useState([]);
 
   // App Startup Gatekeeper Lock State
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
@@ -45,7 +49,7 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isUnlockTimelineOpen, setIsUnlockTimelineOpen] = useState(false);
-
+  const [isIntruderLogsOpen, setIsIntruderLogsOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -71,6 +75,15 @@ export default function App() {
     return () => unsubscribe();
   }, [pairInfo?.code]);
 
+  // Subscribe to Realtime Intruder Logs
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToIntruderLogs(pairCode, (fetchedLogs) => {
+      setIntruderLogs(fetchedLogs);
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
   // Subscribe to Realtime Letters
   useEffect(() => {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
@@ -81,6 +94,7 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [pairInfo?.code, user?.uid]);
+
 
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
 
@@ -139,6 +153,8 @@ export default function App() {
         user={user}
         pairInfo={pairInfo}
         isLettersUnlocked={isLettersUnlocked}
+        intruderCount={intruderLogs.length}
+        onOpenIntruderLogs={() => setIsIntruderLogsOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
         onSignOut={() => signOutUser()}
@@ -310,7 +326,19 @@ export default function App() {
       {/* App Startup Gatekeeper Lock Modal */}
       <AppLockModal
         isOpen={!isAppUnlocked}
+        pairCode={pairInfo?.code}
         onUnlockSuccess={() => setIsAppUnlocked(true)}
+      />
+
+      {/* Intruder Logs Security Modal */}
+      <IntruderLogsModal
+        isOpen={isIntruderLogsOpen}
+        onClose={() => setIsIntruderLogsOpen(false)}
+        intruderLogs={intruderLogs}
+        onDeleteLog={async (logId) => {
+          await deleteIntruderLog(logId);
+          setIntruderLogs(prev => prev.filter(l => l.id !== logId));
+        }}
       />
 
     </div>
