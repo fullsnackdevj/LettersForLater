@@ -141,17 +141,17 @@ export default function LetterEditorModal({
         <div className="tape-strip"></div>
 
         {/* Modal Top Bar */}
-        <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-6 py-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="wax-seal w-8 h-8">
+        <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            <div className="wax-seal w-8 h-8 shrink-0">
               <PenTool className="w-4 h-4 text-[#F8E3B6]" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold font-serif-vintage text-[#36271C]">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold font-serif-vintage text-[#36271C] truncate">
                 {existingLetter ? 'Edit Your Sealed Letter' : 'Compose Letter for Later'}
               </h2>
               {/* Immutable PHT Stamp Notice */}
-              <div className="flex items-center gap-1.5 text-xs text-[#8B0000] font-mono mt-0.5">
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs text-[#8B0000] font-mono mt-0.5 flex-wrap">
                 <Clock className="w-3 h-3 shrink-0" />
                 <span>Timestamp: <strong>{phtStamp}</strong> (Locked)</span>
               </div>
@@ -160,14 +160,14 @@ export default function LetterEditorModal({
 
           <button
             onClick={onClose}
-            className="text-[#9E8B75] hover:text-[#36271C] p-1.5 rounded-full hover:bg-[#EFE9DE] transition-colors"
+            className="text-[#9E8B75] hover:text-[#36271C] p-1.5 rounded-full hover:bg-[#EFE9DE] transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form Body - Scrollable Stationery Desk */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1 stationery-sheet text-sm">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 stationery-sheet text-sm">
           
           {/* Title Input */}
           <div>
@@ -176,18 +176,18 @@ export default function LetterEditorModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Give your letter a memorable title..."
-              className="w-full bg-transparent border-b-2 border-[#C8B9A6] focus:border-[#A83232] font-serif-vintage font-bold text-xl text-[#36271C] placeholder-[#9E8B75] focus:outline-none py-1 transition-colors"
+              className="w-full bg-transparent border-b-2 border-[#C8B9A6] focus:border-[#A83232] font-serif-vintage font-bold text-lg sm:text-xl text-[#36271C] placeholder-[#9E8B75] focus:outline-none py-1 transition-colors"
             />
           </div>
 
           {/* Very Important Toggle & Reason */}
-          <div className="bg-[#FAF5EC] p-4 rounded-xl border border-[#EBE3D5] space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#FAF5EC] p-3.5 sm:p-4 rounded-xl border border-[#EBE3D5] space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsVeryImportant(!isVeryImportant)}
-                  className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${
+                  className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
                     isVeryImportant 
                       ? 'bg-[#D4AF37] border-[#AA7C11] text-[#3D2600]' 
                       : 'bg-white border-[#C8B9A6] text-transparent'
@@ -201,7 +201,7 @@ export default function LetterEditorModal({
               </div>
               
               {isVeryImportant && (
-                <span className="important-ribbon text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="important-ribbon text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                   Priority Memory
                 </span>
               )}
@@ -224,13 +224,13 @@ export default function LetterEditorModal({
           </div>
 
           {/* Mood Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Smile className="w-4 h-4 text-[#C86D51] shrink-0" />
             <span className="text-xs font-bold text-[#4A3B2C] uppercase tracking-wider">Mood:</span>
             <select
               value={mood}
               onChange={(e) => setMood(e.target.value)}
-              className="bg-[#FAF5EC] border border-[#D2C3B0] rounded-lg px-2.5 py-1 text-xs text-[#36271C] focus:outline-none"
+              className="bg-[#FAF5EC] border border-[#D2C3B0] rounded-lg px-2.5 py-1 text-xs text-[#36271C] focus:outline-none max-w-full"
             >
               {MOOD_OPTIONS.map(m => (
                 <option key={m} value={m}>{m}</option>
@@ -243,7 +243,7 @@ export default function LetterEditorModal({
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={8}
+              rows={7}
               placeholder="Write your letter here... pour out your feelings, thoughts, and memories for 2032..."
               className="w-full bg-transparent font-typewriter text-[#36271C] text-sm focus:outline-none resize-none leading-[28px] tracking-wide placeholder-[#A69888]"
             />
@@ -251,7 +251,7 @@ export default function LetterEditorModal({
 
           {/* Bulk Images Dropzone & Polaroid Previews */}
           <div className="border-t border-[#E2D7C7] pt-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-[#A83232]" />
                 <span className="text-xs font-bold text-[#4A3B2C] uppercase tracking-wider">
@@ -260,7 +260,7 @@ export default function LetterEditorModal({
               </div>
 
               {/* Compressed Badge */}
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shrink-0">
                 <Zap className="w-3 h-3 text-emerald-600" />
                 Auto-Compressed (100% Free Storage)
               </span>
@@ -285,7 +285,7 @@ export default function LetterEditorModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-2 right-2 bg-rose-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                      className="absolute top-2 right-2 bg-rose-700 text-white p-1 rounded-full opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md"
                       title="Remove image"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -296,8 +296,8 @@ export default function LetterEditorModal({
             )}
 
             {/* Upload Dropzone Button */}
-            <label className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-[#C8B9A6] hover:border-[#A83232] rounded-xl bg-[#FAF5EC]/60 hover:bg-[#FAF5EC] cursor-pointer transition-colors text-xs text-[#4A3B2C]">
-              <Upload className="w-4 h-4 text-[#A83232]" />
+            <label className="flex items-center justify-center gap-2 w-full p-3.5 sm:p-4 border-2 border-dashed border-[#C8B9A6] hover:border-[#A83232] rounded-xl bg-[#FAF5EC]/60 hover:bg-[#FAF5EC] cursor-pointer transition-colors text-xs text-[#4A3B2C] text-center">
+              <Upload className="w-4 h-4 text-[#A83232] shrink-0" />
               <span className="font-semibold">
                 {isCompressing ? 'Compressing Photos...' : 'Add Bulk Photos (Auto-compressed to ~150KB)'}
               </span>
@@ -315,18 +315,18 @@ export default function LetterEditorModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-[#FAF5EC] border-t border-[#E2D7C7] px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="bg-[#FAF5EC] border-t border-[#E2D7C7] px-4 sm:px-6 py-3 sm:py-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
           <button
             type="button"
             onClick={() => handleSubmit(true)}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#EFE9DE] hover:bg-[#E2D7C7] text-[#4A3B2C] text-xs font-semibold rounded-xl border border-[#D2C3B0] transition-colors"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#EFE9DE] hover:bg-[#E2D7C7] text-[#4A3B2C] text-xs font-semibold rounded-xl border border-[#D2C3B0] transition-colors"
           >
             <FileText className="w-4 h-4" />
             <span>Save as Draft</span>
           </button>
 
-          <div className="flex gap-3">
+          <div className="flex items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
@@ -339,7 +339,7 @@ export default function LetterEditorModal({
               type="button"
               onClick={() => handleSubmit(false)}
               disabled={isSaving || isCompressing}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold rounded-xl shadow-md transition-all hover:scale-105"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold rounded-xl shadow-md transition-all hover:scale-105"
             >
               <Lock className="w-4 h-4" />
               <span>{isSaving ? 'Sealing...' : 'Seal Letter in Vault'}</span>

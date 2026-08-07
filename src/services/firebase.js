@@ -214,6 +214,33 @@ export async function savePairInfo(pairData) {
   return formatted;
 }
 
+export function subscribeToPairInfo(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const pairRef = doc(db, 'pairs', cleanCode);
+    return onSnapshot(pairRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data());
+      }
+    });
+  }
+
+  // Fallback local polling subscription
+  const pollInterval = setInterval(() => {
+    const localPair = localStorage.getItem(LOCAL_PAIR_KEY);
+    if (localPair) {
+      const parsed = JSON.parse(localPair);
+      if (parsed.code === cleanCode) callback(parsed);
+    }
+  }, 1000);
+
+  getPairInfo(cleanCode).then(info => {
+    if (info) callback(info);
+  });
+
+  return () => clearInterval(pollInterval);
+}
+
 /**
  * Letter Storage Service
  */

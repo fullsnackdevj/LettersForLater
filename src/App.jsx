@@ -7,6 +7,7 @@ import PairingModal from './components/PairingModal';
 import LetterEditorModal from './components/LetterEditorModal';
 import LetterDetailModal from './components/LetterDetailModal';
 import UnlockTimelineModal from './components/UnlockTimelineModal';
+import AppLockModal from './components/AppLockModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -17,7 +18,8 @@ import {
   savePairInfo, 
   saveLetterToCloud, 
   deleteLetterFromCloud, 
-  subscribeToLetters 
+  subscribeToLetters,
+  subscribeToPairInfo
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -31,6 +33,9 @@ export default function App() {
   });
   const [letters, setLetters] = useState([]);
 
+  // App Startup Gatekeeper Lock State
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false);
+
   // Active View Tab: 'vault' | 'timeline'
   const [activeTab, setActiveTab] = useState('vault');
 
@@ -40,6 +45,7 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isUnlockTimelineOpen, setIsUnlockTimelineOpen] = useState(false);
+
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -56,12 +62,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch / Subscribe to Pair Info
+  // Fetch / Subscribe to Realtime Pair Info
   useEffect(() => {
-    getPairInfo(pairInfo.code).then(info => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToPairInfo(pairCode, (info) => {
       if (info) setPairInfo(info);
     });
-  }, []);
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
 
   // Subscribe to Realtime Letters
   useEffect(() => {
@@ -76,10 +84,20 @@ export default function App() {
 
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
 
+  const hasMatchingUnlockCodes = () => {
+    const unlockCodes = pairInfo?.unlockCodes || {};
+    const values = Object.values(unlockCodes);
+    return (
+      values.length >= 2 && 
+      values.every(v => v && v.trim().toLowerCase() === values[0].trim().toLowerCase())
+    );
+  };
+
+  const isLettersUnlocked = countdown.isUnlocked && hasMatchingUnlockCodes();
+
   // Handlers
   const handleSaveLetter = async (letterData) => {
     const saved = await saveLetterToCloud(letterData);
-    // Refresh list locally if needed
     setLetters(prev => {
       const idx = prev.findIndex(l => l.id === saved.id);
       if (idx >= 0) {
@@ -101,18 +119,12 @@ export default function App() {
     setPairInfo(updated);
   };
 
-  const hasMatchingUnlockCodes = () => {
-    const unlockCodes = pairInfo?.unlockCodes || {};
-    const values = Object.values(unlockCodes);
-    return values.length >= 2 && values.every(v => v === values[0]);
-  };
-
   const handleTimelineButtonClick = () => {
     if (!countdown.isUnlocked) {
       return; // Disabled before 2032
     }
     
-    if (hasMatchingUnlockCodes()) {
+    if (isLettersUnlocked) {
       setActiveTab('timeline');
     } else {
       setIsUnlockTimelineOpen(true);
@@ -126,6 +138,7 @@ export default function App() {
       <Navbar
         user={user}
         pairInfo={pairInfo}
+        isLettersUnlocked={isLettersUnlocked}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
         onSignOut={() => signOutUser()}
@@ -161,7 +174,7 @@ export default function App() {
               <Lock className="w-3.5 h-3.5" />
               <span>Locked Until The Right Time</span>
             </>
-          ) : hasMatchingUnlockCodes() ? (
+          ) : isLettersUnlocked ? (
             <>
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               <span>Unlocked Timeline</span>
@@ -169,11 +182,12 @@ export default function App() {
           ) : (
             <>
               <Key className="w-3.5 h-3.5" />
-              <span>Unlock 2032 Timeline</span>
+              <span>Reveal All The Letters</span>
             </>
           )}
         </button>
       </div>
+
 
       {/* Main Content View */}
       <main className="flex-1">
@@ -293,6 +307,13 @@ export default function App() {
         }}
       />
 
+      {/* App Startup Gatekeeper Lock Modal */}
+      <AppLockModal
+        isOpen={!isAppUnlocked}
+        onUnlockSuccess={() => setIsAppUnlocked(true)}
+      />
+
     </div>
   );
 }
+

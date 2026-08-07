@@ -5,6 +5,7 @@ import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 export default function Navbar({ 
   user, 
   pairInfo, 
+  isLettersUnlocked,
   onOpenAuth, 
   onOpenPairing, 
   onSignOut 
@@ -70,18 +71,35 @@ export default function Navbar({
         {/* User & Pair Actions */}
         <div className="flex items-center gap-3">
           
-          {/* Pair Code Status Button */}
+          {/* Wedding Hashtag / Sealed Status Pill */}
           <button
-            onClick={onOpenPairing}
-            className="flex items-center gap-2 bg-[#FDFBF7] hover:bg-[#EFE9DE] border border-[#D2C3B0] text-[#36271C] text-xs font-medium px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-            title="Manage Partner Pairing Code"
+            onClick={isLettersUnlocked ? onOpenPairing : undefined}
+            disabled={!isLettersUnlocked}
+            className={`flex items-center gap-2 border px-3 py-1.5 rounded-lg transition-colors shadow-sm ${
+              isLettersUnlocked
+                ? 'bg-[#FDFBF7] hover:bg-[#EFE9DE] border-[#D2C3B0] text-[#36271C] cursor-pointer'
+                : 'bg-[#FAF5EC] border-[#E2D7C7] text-[#6E1A1A] cursor-default opacity-85'
+            }`}
+            title={isLettersUnlocked ? "Wedding Hashtag: #JayFinallyGotAKiss" : "Sealed Until Unlocked in 2032"}
           >
-            <Key className="w-3.5 h-3.5 text-[#C86D51]" />
-            <span className="hidden sm:inline">Pair:</span>
-            <span className="font-mono font-bold tracking-wider text-[#A83232]">
-              {pairInfo?.code || 'PAIR-NOW'}
-            </span>
+            {isLettersUnlocked ? (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span className="font-mono font-bold tracking-wider text-[#A83232]">
+                  {pairInfo?.code || '#JayFinallyGotAKiss'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <span className="font-mono text-[11px] font-bold text-[#6E1A1A]">
+                  Sealed
+                </span>
+              </>
+            )}
           </button>
+
+
 
           {/* Auth Button / Profile Avatar */}
           {user ? (

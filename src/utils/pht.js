@@ -103,3 +103,58 @@ export function getCountdownToTarget(targetDateIso = DEFAULT_TARGET_UNLOCK_DATE)
     totalDiffMs: diff
   };
 }
+
+/**
+ * Generate dynamic passcode format: [dayAbbr][dayNum][timeWithoutColonAndSpaces]
+ * Example: Friday, 12, 1:45am -> fri12145am
+ */
+export function generateDynamicPasscode(dateObj = new Date(), timeZone = 'Asia/Manila') {
+  try {
+    const dayAbbr = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone }).toLowerCase(); // e.g. 'fri'
+    const dayNum = dateObj.toLocaleDateString('en-US', { day: 'numeric', timeZone }); // e.g. '12'
+    
+    // Time formatted e.g. "1:45 AM"
+    const timeStr = dateObj.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true, 
+      timeZone 
+    }).toLowerCase(); // e.g. '1:45 am'
+    
+    // Remove colons and spaces: '1:45 am' -> '145am'
+    const cleanTime = timeStr.replace(/[:\s]/g, '');
+    
+    return `${dayAbbr}${dayNum}${cleanTime}`;
+  } catch (e) {
+    console.error('Error generating dynamic passcode:', e);
+    return '';
+  }
+}
+
+/**
+ * Validate input against current dynamic passcode (PHT / Local) or backup codes (!kiss, !jay)
+ */
+export function validateAppLockPasscode(inputCode) {
+  if (!inputCode) return false;
+  const cleanInput = inputCode.trim().toLowerCase();
+  
+  // Backup master passcodes
+  if (cleanInput === '!kiss' || cleanInput === '!jay') {
+    return true;
+  }
+  
+  const now = new Date();
+  const prevMin = new Date(now.getTime() - 60000); // 1 minute buffer for clock rollover while typing
+  
+  // Check PHT timezone codes
+  const phtCodeNow = generateDynamicPasscode(now, 'Asia/Manila');
+  const phtCodePrev = generateDynamicPasscode(prevMin, 'Asia/Manila');
+  
+  // Check local system timezone codes
+  const localCodeNow = generateDynamicPasscode(now, undefined);
+  const localCodePrev = generateDynamicPasscode(prevMin, undefined);
+  
+  const validCodes = [phtCodeNow, phtCodePrev, localCodeNow, localCodePrev].filter(Boolean);
+  return validCodes.includes(cleanInput);
+}
+
