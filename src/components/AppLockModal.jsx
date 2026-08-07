@@ -5,7 +5,6 @@ import { getCurrentPHT, generateDynamicPasscode, validateAppLockPasscode } from 
 export default function AppLockModal({ isOpen, onUnlockSuccess }) {
   const [passcode, setPasscode] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [showHint, setShowHint] = useState(false);
   const [phtInfo, setPhtInfo] = useState(getCurrentPHT());
 
   // Live PHT Clock Ticker
@@ -19,8 +18,6 @@ export default function AppLockModal({ isOpen, onUnlockSuccess }) {
 
   if (!isOpen) return null;
 
-  const currentDynamicCode = generateDynamicPasscode(new Date(), 'Asia/Manila');
-
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!passcode.trim()) {
@@ -32,7 +29,7 @@ export default function AppLockModal({ isOpen, onUnlockSuccess }) {
       setErrorMsg('');
       onUnlockSuccess();
     } else {
-      setErrorMsg('Incorrect passcode! Check current day, date, & time (e.g. fri12145am) or use your backup code.');
+      setErrorMsg('Incorrect passcode. Access denied.');
     }
   };
 
@@ -68,43 +65,21 @@ export default function AppLockModal({ isOpen, onUnlockSuccess }) {
         {/* Passcode Entry Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-[#4A3B2C] uppercase tracking-wider">
-                Enter Security Passcode
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowHint(!showHint)}
-                className="text-[11px] text-[#C86D51] hover:underline flex items-center gap-1 font-semibold"
-              >
-                <HelpCircle className="w-3 h-3" />
-                <span>{showHint ? 'Hide Format' : 'Passcode Format'}</span>
-              </button>
-            </div>
+            <label className="block text-xs font-bold text-[#4A3B2C] uppercase tracking-wider mb-1.5 text-center">
+              Enter Security Passcode
+            </label>
 
             <input
-              type="text"
+              type="password"
               value={passcode}
               onChange={(e) => {
                 setPasscode(e.target.value);
                 if (errorMsg) setErrorMsg('');
               }}
-              placeholder="e.g. fri12145am"
+              placeholder="Enter Passcode"
               autoFocus
               className="w-full bg-[#FAF6F0] border-2 border-[#D2C3B0] focus:border-[#A83232] rounded-2xl px-4 py-3.5 font-mono text-center font-bold text-lg tracking-wider text-[#36271C] focus:outline-none focus:ring-2 focus:ring-[#A83232]/20 transition-all placeholder-[#B0A290]"
             />
-
-            {/* Passcode Format Hint Box */}
-            {showHint && (
-              <div className="mt-2 bg-[#F3E5AB]/40 border border-[#D4AF37]/50 rounded-xl p-3 text-[11px] text-[#4A3B2C] space-y-1 animate-fadeIn">
-                <p className="font-bold text-[#8B0000]">🔑 Passcode Formula:</p>
-                <p><code>[day][date][time]</code> (lowercase, no colons/spaces)</p>
-                <p className="text-[#9E8B75] italic">Example for Fri, 12th, 1:45am → <strong>fri12145am</strong></p>
-                <p className="text-[10px] text-amber-900 pt-1 font-semibold">
-                  💡 Hint for right now: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-amber-300">{currentDynamicCode}</span>
-                </p>
-              </div>
-            )}
 
             {/* Error Message Alert */}
             {errorMsg && (
@@ -123,6 +98,7 @@ export default function AppLockModal({ isOpen, onUnlockSuccess }) {
             <span>Unlock Vault Access</span>
           </button>
         </form>
+
 
         <p className="text-[10px] text-center text-[#9E8B75] italic">
           LettersForLater Time Capsule Protection • Keeps memories safe
