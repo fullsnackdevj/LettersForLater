@@ -10,6 +10,7 @@ import LetterDetailModal from './components/LetterDetailModal';
 import UnlockTimelineModal from './components/UnlockTimelineModal';
 import AppLockModal from './components/AppLockModal';
 import InfoModal from './components/InfoModal';
+import FloatingCompanion from './components/FloatingCompanion';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -328,6 +329,11 @@ export default function App() {
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
       />
+
+      {/* Floating Jay Companion */}
+      {isAppUnlocked && !isAuthOpen && (
+        <FloatingCompanion currentUser={user} pairInfo={pairInfo} />
+      )}
 
     </div>
   );
