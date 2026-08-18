@@ -10,6 +10,11 @@ service cloud.firestore {
     // Pairs info (reading & writing pairs)
     match /pairs/{pairId} {
       allow read, write: if request.auth != null;
+
+      // Subcollections under pairs (dailyMisses counter, etc.)
+      match /{subcollection=**} {
+        allow read, write: if request.auth != null;
+      }
     }
 
     // Letters collection
