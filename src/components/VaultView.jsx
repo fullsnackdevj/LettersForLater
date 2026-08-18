@@ -21,6 +21,7 @@ import {
 import LetterCard from './LetterCard';
 import MissYouWidget from './MissYouWidget';
 import { getCountdownToTarget } from '../utils/pht';
+import { getNickname } from '../utils/nicknames';
 
 export default function VaultView({ 
   letters, 
@@ -152,7 +153,7 @@ export default function VaultView({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">
-              {pairInfo?.user2?.name || 'Partner'}'s
+              {getNickname(pairInfo?.user2?.name) || 'Partner'}'s
             </p>
             <p className="text-xl sm:text-2xl font-bold font-serif text-[#36271C]">
               {partnerLetters.length} <span className="text-[10px] sm:text-xs font-normal text-rose-700 font-semibold">waiting</span>

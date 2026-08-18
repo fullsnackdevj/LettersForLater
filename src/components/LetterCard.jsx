@@ -1,5 +1,6 @@
 import React from 'react';
 import { Lock, Edit, Star, Clock, Image as ImageIcon, Sparkles, FileText, User } from 'lucide-react';
+import { getNickname } from '../utils/nicknames';
 
 export default function LetterCard({ 
   letter, 
@@ -31,7 +32,7 @@ export default function LetterCard({
         </div>
 
         <h3 className="font-serif-vintage font-bold text-base sm:text-lg text-[#36271C] mb-1">
-          Sealed Letter from {letter.authorName || 'Partner'}
+          Sealed Letter from {getNickname(letter.authorName) || 'Partner'}
         </h3>
         
         <p className="text-xs text-[#9E8B75] font-handwriting text-base mb-3">
@@ -103,7 +104,7 @@ export default function LetterCard({
               className="w-6 h-6 rounded-full object-cover border border-[#D4AF37]"
             />
             <span className="text-xs font-bold text-[#4A3B2C] truncate">
-              {isOwner ? 'You' : letter.authorName}
+              {isOwner ? 'You' : getNickname(letter.authorName)}
             </span>
           </div>
 

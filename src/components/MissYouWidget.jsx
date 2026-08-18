@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Heart, Sparkles, AlertTriangle, Timer } from 'lucide-react';
 import { recordMissYou, subscribeToDailyMisses } from '../services/firebase';
 import { getTodayPHTKey } from '../utils/pht';
+import { getNickname } from '../utils/nicknames';
 
 const SPAM_THRESHOLD = 5;        // consecutive rapid taps to trigger cooldown
 const SPAM_WINDOW_MS = 2000;     // max ms between taps to count as consecutive
@@ -21,8 +22,8 @@ export default function MissYouWidget({ currentUser, pairInfo }) {
   const cooldownTimer = useRef(null);
 
   const currentUserId = currentUser?.uid || 'demo-user-1';
-  const currentUserName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'You';
-  const partnerName = pairInfo?.user2?.name || 'Partner';
+  const currentUserName = getNickname(currentUser?.displayName || currentUser?.email?.split('@')[0]);
+  const partnerName = getNickname(pairInfo?.user2?.name) || 'Partner';
 
   const todayKey = getTodayPHTKey();
   const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';

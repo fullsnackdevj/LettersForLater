@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Lock, Heart, Key, LogIn, LogOut, User, Sparkles, AlertCircle, HelpCircle } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
+import { getNickname } from '../utils/nicknames';
 
 export default function Navbar({ 
   user, 
@@ -134,7 +135,7 @@ export default function Navbar({
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     <div>
-                      <p className="font-bold text-sm text-[#36271C]">{user.displayName}</p>
+                      <p className="font-bold text-sm text-[#36271C]">{getNickname(user.displayName)}</p>
                       <p className="text-[#9E8B75] truncate">{user.email}</p>
                     </div>
                   </div>

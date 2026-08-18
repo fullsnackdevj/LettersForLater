@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, Star, Trash2, Edit, ZoomIn, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getNickname } from '../utils/nicknames';
 
 export default function LetterDetailModal({ 
   letter, 
@@ -96,7 +97,7 @@ export default function LetterDetailModal({
             />
             <div>
               <p className="font-bold text-xs sm:text-sm text-[#36271C]">
-                {isOwner ? 'Written by You' : `Written by ${letter.authorName}`}
+                {isOwner ? 'Written by You' : `Written by ${getNickname(letter.authorName)}`}
               </p>
               <div className="flex items-center gap-1 text-[11px] sm:text-xs text-[#8B0000] font-mono mt-0.5">
                 <Clock className="w-3.5 h-3.5" />
