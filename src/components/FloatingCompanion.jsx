@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Sparkles, MessageCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, Sparkles, X } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 
 const COMPANION_MESSAGES = [
@@ -42,16 +42,13 @@ const COMPANION_MESSAGES = [
 ];
 
 export default function FloatingCompanion({ currentUser, pairInfo }) {
-  const [isOpen, setIsOpen] = useState(true);
   const [bubbleMessage, setBubbleMessage] = useState(null);
   const [isBouncing, setIsBouncing] = useState(false);
   const [floatingParticles, setFloatingParticles] = useState([]);
   const messageTimeoutRef = useRef(null);
 
-  // Periodic subtle greeting bubble (every 40s if idle and open)
+  // Periodic subtle greeting bubble (every 40s if idle)
   useEffect(() => {
-    if (!isOpen) return;
-
     const interval = setInterval(() => {
       if (!bubbleMessage && Math.random() < 0.45) {
         showRandomMessage();
@@ -59,7 +56,7 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
     }, 40000);
 
     return () => clearInterval(interval);
-  }, [isOpen, bubbleMessage]);
+  }, [bubbleMessage]);
 
   // Clean up message timeout on unmount
   useEffect(() => {
@@ -112,7 +109,7 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
     <aside aria-label="Floating Jay & Lily Companion" className="fixed bottom-0 left-[5px] z-40 flex flex-col items-start pointer-events-none select-none">
       
       {/* Speech Bubble */}
-      {isOpen && bubbleMessage && (
+      {bubbleMessage && (
         <div 
           onClick={showRandomMessage}
           className="pointer-events-auto mb-1.5 ml-3 bg-[#FAF5EC] text-[#2D1F15] border-2 border-[#D4AF37]/70 px-4 sm:px-5 py-3 rounded-2xl shadow-2xl max-w-[270px] sm:max-w-[340px] font-handwriting text-xl sm:text-2xl font-bold tracking-wide leading-snug animate-fadeIn cursor-pointer hover:border-[#A83232] transition-colors relative select-text"
@@ -164,43 +161,30 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
       <div className="flex items-end pointer-events-auto">
         
         {/* Character Sprite */}
-        {isOpen ? (
-          <div
-            onClick={handleSpriteClick}
-            className={`group relative cursor-pointer transition-transform duration-300 ${
-              isBouncing ? 'scale-110 -translate-y-2' : 'hover:scale-105 active:scale-95'
-            }`}
-            title="Tap Jay & Lily to say hi!"
-          >
-            {/* Soft Ambient Glow under sprite */}
-            <div className="absolute -inset-4 bg-gradient-to-r from-amber-300/35 via-rose-300/35 to-amber-300/35 rounded-full blur-2xl opacity-80 group-hover:opacity-100 transition-opacity" />
-
-            {/* Jay & Lily Animated GIF Sprite - Flush to bottom-left */}
-            <div className="relative w-40 h-40 sm:w-56 sm:h-56 flex items-end justify-start filter drop-shadow-2xl">
-              <img
-                src="/char-jay-with-lily.gif"
-                alt="Jay & Lily Companion"
-                className="w-full h-full object-contain object-left-bottom pointer-events-none"
-              />
-            </div>
-
-            {/* Little tap indicator badge */}
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-[#4A1010]/90 text-[#F8E3B6] border border-[#D4AF37]/50 text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Tap us! 💕
-            </div>
-          </div>
-        ) : null}
-
-        {/* Toggle / Minimize Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`bg-[#FAF5EC]/90 backdrop-blur-xs hover:bg-[#FAF5EC] text-[#7A6855] hover:text-[#A83232] border border-[#D2C3B0] rounded-full p-2 shadow-md transition-all hover:scale-110 ${
-            isOpen ? 'mb-4 -ml-1 sm:ml-0' : 'mb-3 ml-5'
+        <div
+          onClick={handleSpriteClick}
+          className={`group relative cursor-pointer transition-transform duration-300 ${
+            isBouncing ? 'scale-110 -translate-y-2' : 'hover:scale-105 active:scale-95'
           }`}
-          title={isOpen ? "Minimize Companion" : "Show Jay & Lily"}
+          title="Tap Jay & Lily to say hi!"
         >
-          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
+          {/* Soft Ambient Glow under sprite */}
+          <div className="absolute -inset-4 bg-gradient-to-r from-amber-300/35 via-rose-300/35 to-amber-300/35 rounded-full blur-2xl opacity-80 group-hover:opacity-100 transition-opacity" />
+
+          {/* Jay & Lily Animated GIF Sprite - Flush to bottom-left */}
+          <div className="relative w-40 h-40 sm:w-56 sm:h-56 flex items-end justify-start filter drop-shadow-2xl">
+            <img
+              src="/char-jay-with-lily.gif"
+              alt="Jay & Lily Companion"
+              className="w-full h-full object-contain object-left-bottom pointer-events-none"
+            />
+          </div>
+
+          {/* Little tap indicator badge */}
+          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-[#4A1010]/90 text-[#F8E3B6] border border-[#D4AF37]/50 text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            Tap us! 💕
+          </div>
+        </div>
 
       </div>
 
