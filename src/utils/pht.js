@@ -36,6 +36,20 @@ export function getCurrentPHT() {
 }
 
 /**
+ * Get current date key formatted in PHT (YYYY-MM-DD)
+ */
+export function getTodayPHTKey() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(now);
+}
+
+/**
  * Format a given timestamp/ISO string into PHT date & time
  */
 export function formatToPHT(dateInput) {

@@ -19,6 +19,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import LetterCard from './LetterCard';
+import MissYouWidget from './MissYouWidget';
 import { getCountdownToTarget } from '../utils/pht';
 
 export default function VaultView({ 
@@ -70,58 +71,58 @@ export default function VaultView({
   const paginatedLetters = processedLetters.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-8">
       
-      {/* 2032 Countdown & Vault Banner */}
-      <div className="relative bg-gradient-to-br from-[#4A1010] via-[#6E1A1A] to-[#36271C] text-[#F8E3B6] rounded-3xl p-6 sm:p-10 shadow-2xl overflow-hidden border-2 border-[#D4AF37]/40">
+      {/* 2032 Countdown & Vault Banner (Compact Mobile First) */}
+      <div className="relative bg-gradient-to-br from-[#4A1010] via-[#6E1A1A] to-[#36271C] text-[#F8E3B6] rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl overflow-hidden border border-[#D4AF37]/40 space-y-3">
         
-        {/* Background Decorative Seals & Ribbons */}
+        {/* Background Decorative Seals */}
         <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none select-none">
-          <Mail className="w-48 h-48 text-[#F3E5AB]" />
+          <Mail className="w-32 h-32 sm:w-48 sm:h-48 text-[#F3E5AB]" />
         </div>
 
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F3E5AB] text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm">
-            <Lock className="w-3.5 h-3.5 text-[#D4AF37]" />
+        <div className="relative z-10 max-w-3xl space-y-2">
+          <div className="inline-flex items-center gap-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F3E5AB] text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full backdrop-blur-sm">
+            <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D4AF37]" />
             <span>Time Capsule Vault • Sealed Until August 6, 2032</span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-serif-vintage tracking-tight text-[#FDFBF7]">
+          <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold font-serif-vintage tracking-tight text-[#FDFBF7]">
             Writing for our future selves.
           </h2>
 
-          <p className="text-sm sm:text-base text-[#F4EFE6]/80 leading-relaxed font-handwriting text-xl">
+          <p className="hidden sm:block text-sm text-[#F4EFE6]/80 leading-relaxed font-handwriting text-xl">
             Letters written today remain safely locked in our cloud vault. Every memory, photo attachment, and PHT timestamp will be revealed together when 2032 arrives.
           </p>
 
-          {/* Live Countdown Grid */}
-          <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-3 rounded-2xl text-center">
-              <span className="block font-mono text-2xl sm:text-3xl font-bold text-[#F3E5AB]">
+          {/* Compact Live Countdown Grid (Single row on all screens) */}
+          <div className="pt-1 grid grid-cols-4 gap-2 max-w-md">
+            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
+              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
                 {countdown.years}
               </span>
-              <span className="text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Years</span>
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Yrs</span>
             </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-3 rounded-2xl text-center">
-              <span className="block font-mono text-2xl sm:text-3xl font-bold text-[#F3E5AB]">
+            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
+              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
                 {countdown.days}
               </span>
-              <span className="text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Days</span>
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Days</span>
             </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-3 rounded-2xl text-center">
-              <span className="block font-mono text-2xl sm:text-3xl font-bold text-[#F3E5AB]">
+            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
+              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
                 {countdown.hours}
               </span>
-              <span className="text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Hours</span>
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Hrs</span>
             </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-3 rounded-2xl text-center">
-              <span className="block font-mono text-2xl sm:text-3xl font-bold text-[#F3E5AB]">
+            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
+              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
                 {countdown.minutes}
               </span>
-              <span className="text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Mins</span>
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Mins</span>
             </div>
           </div>
         </div>
@@ -174,6 +175,9 @@ export default function VaultView({
         </button>
 
       </div>
+
+      {/* Real-time "I Miss You" Interactive Counter Widget */}
+      <MissYouWidget currentUser={currentUser} pairInfo={pairInfo} />
 
       {/* Filter Tabs, Sort Dropdown & Search Bar */}
       <div className="bg-[#FDFBF7] p-2.5 sm:p-3.5 rounded-2xl border border-[#E2D7C7] shadow-sm space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">

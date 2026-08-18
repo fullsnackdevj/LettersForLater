@@ -13,7 +13,8 @@ import {
   where, 
   onSnapshot,
   serverTimestamp,
-  getDocs
+  getDocs,
+  increment
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
@@ -347,6 +348,78 @@ export function subscribeToLetters(pairId, currentUserId, callback) {
   }, 1000);
 
   callback(getLocalLetters());
+  return () => clearInterval(pollInterval);
+}
+
+/**
+ * Daily "I Miss You" Counter Services
+ */
+export async function recordMissYou(pairCode, user, dateKey) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'You';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const missRef = doc(db, 'pairs', cleanCode, 'dailyMisses', dateKey);
+    const snap = await getDoc(missRef);
+    if (!snap.exists()) {
+      await setDoc(missRef, {
+        dateKey,
+        total: 1,
+        [`count_${userId}`]: 1,
+        lastTappedBy: userId,
+        lastTappedByName: userName,
+        lastTappedAt: timestamp
+      });
+    } else {
+      await updateDoc(missRef, {
+        total: increment(1),
+        [`count_${userId}`]: increment(1),
+        lastTappedBy: userId,
+        lastTappedByName: userName,
+        lastTappedAt: timestamp
+      });
+    }
+    return;
+  }
+
+  // Local Storage Fallback
+  const key = `misses_${cleanCode}_${dateKey}`;
+  const raw = localStorage.getItem(key);
+  const data = raw ? JSON.parse(raw) : { dateKey, total: 0 };
+  data.total = (data.total || 0) + 1;
+  data[`count_${userId}`] = (data[`count_${userId}`] || 0) + 1;
+  data.lastTappedBy = userId;
+  data.lastTappedByName = userName;
+  data.lastTappedAt = timestamp;
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+export function subscribeToDailyMisses(pairCode, dateKey, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const missRef = doc(db, 'pairs', cleanCode, 'dailyMisses', dateKey);
+    return onSnapshot(missRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data());
+      } else {
+        callback({ dateKey, total: 0 });
+      }
+    });
+  }
+
+  // Local storage polling fallback
+  const key = `misses_${cleanCode}_${dateKey}`;
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(key);
+    if (raw) callback(JSON.parse(raw));
+  }, 1000);
+
+  const raw = localStorage.getItem(key);
+  if (raw) callback(JSON.parse(raw));
+  else callback({ dateKey, total: 0 });
+
   return () => clearInterval(pollInterval);
 }
 

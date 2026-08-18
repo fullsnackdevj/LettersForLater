@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Lock, Heart, Key, LogIn, LogOut, User, Sparkles, AlertCircle } from 'lucide-react';
+import { Clock, Lock, Heart, Key, LogIn, LogOut, User, Sparkles, AlertCircle, HelpCircle } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 
 export default function Navbar({ 
@@ -8,6 +8,7 @@ export default function Navbar({
   isLettersUnlocked,
   onOpenAuth, 
   onOpenPairing, 
+  onOpenInfo,
   onSignOut 
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
@@ -69,7 +70,17 @@ export default function Navbar({
         </div>
 
         {/* User & Pair Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          
+          {/* How It Works Info Button */}
+          <button
+            onClick={onOpenInfo}
+            className="flex items-center gap-1.5 bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] text-[#A83232] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+            title="How this works in the future"
+          >
+            <HelpCircle className="w-4 h-4 text-[#A83232]" />
+            <span className="hidden sm:inline">How It Works</span>
+          </button>
           
           {/* Wedding Hashtag / Sealed Status Pill */}
           <button

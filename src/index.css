@@ -153,3 +153,30 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Floating Heart Particle Burst Animation */
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(0.6);
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-90px) scale(1.3);
+  }
+}
+.animate-floatUp {
+  animation: floatUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Vinyl Disc Rotation Animation */
+@keyframes spinVinyl {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spinVinyl {
+  animation: spinVinyl 4s linear infinite;
+}

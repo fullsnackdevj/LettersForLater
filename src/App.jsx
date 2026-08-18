@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import MusicPlayer from './components/MusicPlayer';
 import VaultView from './components/VaultView';
 import TimelineView from './components/TimelineView';
 import AuthModal from './components/AuthModal';
@@ -8,6 +9,7 @@ import LetterEditorModal from './components/LetterEditorModal';
 import LetterDetailModal from './components/LetterDetailModal';
 import UnlockTimelineModal from './components/UnlockTimelineModal';
 import AppLockModal from './components/AppLockModal';
+import InfoModal from './components/InfoModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -45,6 +47,7 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isUnlockTimelineOpen, setIsUnlockTimelineOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -135,6 +138,11 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col font-sans">
       
+      {/* Very Top Background Music Player — Only active AFTER successful login & app unlock */}
+      {user && isAppUnlocked && !isAuthOpen && (
+        <MusicPlayer audioSrc="/Tugon (The Wedding Version).mp3" songTitle="Tugon (The Wedding Version)" />
+      )}
+
       {/* Top Navbar */}
       <Navbar
         user={user}
@@ -142,6 +150,7 @@ export default function App() {
         isLettersUnlocked={isLettersUnlocked}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
+        onOpenInfo={() => setIsInfoOpen(true)}
         onSignOut={() => signOutUser()}
       />
 
@@ -312,6 +321,12 @@ export default function App() {
       <AppLockModal
         isOpen={!isAppUnlocked}
         onUnlockSuccess={() => setIsAppUnlocked(true)}
+      />
+
+      {/* How It Works Info Modal */}
+      <InfoModal
+        isOpen={isInfoOpen}
+        onClose={() => setIsInfoOpen(false)}
       />
 
     </div>
