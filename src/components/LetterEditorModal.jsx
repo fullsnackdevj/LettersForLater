@@ -22,14 +22,52 @@ import {
 import { getCurrentPHT } from '../utils/pht';
 import { compressImages } from '../utils/imageCompressor';
 
-const MOOD_OPTIONS = [
-  'Warm & Hopeful',
-  'Cozily Peaceful',
-  'Morning Sunshine',
-  'Late Night Thoughts',
-  'Deeply Grateful',
-  'Celebrating Us'
+export const MOOD_CATEGORIES = [
+  {
+    name: '✨ Warm & Happy',
+    options: [
+      'Warm & Hopeful',
+      'Cozily Peaceful',
+      'Morning Sunshine',
+      'Deeply Grateful',
+      'Celebrating Us',
+      'Playful & Sweet',
+    ]
+  },
+  {
+    name: '🌙 Deep & Reflective',
+    options: [
+      'Late Night Thoughts',
+      'Bittersweet Memories',
+      'Nostalgic & Reflective',
+      'Soft & Vulnerable',
+      'Missing You Deeply',
+      'Quiet Solace',
+    ]
+  },
+  {
+    name: '🌧️ Complex & Difficult',
+    options: [
+      'Heavy-Hearted & Sad',
+      'Overwhelmed & Anxious',
+      'Rainy Day Musings',
+      'Somber & Quiet',
+      'Hurt & Needing Comfort',
+      'Feeling Lost',
+    ]
+  },
+  {
+    name: '🕊️ Healing & Reassurance',
+    options: [
+      'Apologetic & Remorseful',
+      'Healing & Moving Forward',
+      'Reassurance & Support',
+      'Quiet Forgiveness',
+    ]
+  }
 ];
+
+export const MOOD_OPTIONS = MOOD_CATEGORIES.flatMap(cat => cat.options);
 
 export default function LetterEditorModal({ 
   isOpen, 
@@ -232,8 +270,12 @@ export default function LetterEditorModal({
               onChange={(e) => setMood(e.target.value)}
               className="bg-[#FAF5EC] border border-[#D2C3B0] rounded-lg px-2.5 py-1 text-xs text-[#36271C] focus:outline-none max-w-full"
             >
-              {MOOD_OPTIONS.map(m => (
-                <option key={m} value={m}>{m}</option>
+              {MOOD_CATEGORIES.map(category => (
+                <optgroup key={category.name} label={category.name}>
+                  {category.options.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
