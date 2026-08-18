@@ -13,8 +13,14 @@ export default function LetterCard({
 
   // Sealed Partner Envelope (Locked until 2032)
   if (isSealedPartnerLetter) {
+    // Count paragraphs from content (split by double newlines or single newlines with content)
+    const paragraphCount = letter.content
+      ? letter.content.split(/\n\s*\n/).filter(p => p.trim().length > 0).length || 1
+      : 0;
+    const photoCount = letter.images?.length || 0;
+
     return (
-      <div className="polaroid-card group cursor-pointer bg-[#F7F2EA] border-2 border-dashed border-[#D2C3B0] p-6 text-center">
+      <div className="polaroid-card group cursor-pointer bg-[#F7F2EA] border-2 border-dashed border-[#D2C3B0] p-5 sm:p-6 text-center">
         <div className="tape-strip"></div>
 
         {/* Sealed Wax Stamp */}
@@ -24,7 +30,7 @@ export default function LetterCard({
           </div>
         </div>
 
-        <h3 className="font-serif-vintage font-bold text-lg text-[#36271C] mb-1">
+        <h3 className="font-serif-vintage font-bold text-base sm:text-lg text-[#36271C] mb-1">
           Sealed Letter from {letter.authorName || 'Partner'}
         </h3>
         
@@ -32,8 +38,34 @@ export default function LetterCard({
           "Contents & photos will unlock in 2032"
         </p>
 
+        {/* Letter Hints / Teaser Metadata */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+          {/* Mood Hint */}
+          {letter.mood && (
+            <span className="bg-[#FAF5EC] border border-[#D2C3B0] text-[#A83232] text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full">
+              {letter.mood}
+            </span>
+          )}
+
+          {/* Paragraph Count Hint */}
+          {paragraphCount > 0 && (
+            <span className="bg-[#FAF5EC] border border-[#D2C3B0] text-[#5C4A3A] text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1">
+              <FileText className="w-3 h-3" />
+              {paragraphCount} {paragraphCount === 1 ? 'paragraph' : 'paragraphs'}
+            </span>
+          )}
+
+          {/* Photo Count Hint */}
+          {photoCount > 0 && (
+            <span className="bg-[#FAF5EC] border border-[#D2C3B0] text-[#5C4A3A] text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1">
+              <ImageIcon className="w-3 h-3" />
+              {photoCount} {photoCount === 1 ? 'photo' : 'photos'} attached
+            </span>
+          )}
+        </div>
+
         {/* Immutable Creation Date */}
-        <div className="inline-flex items-center gap-1.5 bg-[#EFE9DE] px-3 py-1 rounded-full text-[11px] font-mono text-[#8B0000]">
+        <div className="inline-flex items-center gap-1.5 bg-[#EFE9DE] px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-mono text-[#8B0000]">
           <Clock className="w-3 h-3" />
           <span>Written: {letter.createdAtPHT}</span>
         </div>
