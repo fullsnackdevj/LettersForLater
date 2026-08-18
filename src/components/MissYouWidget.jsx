@@ -23,7 +23,9 @@ export default function MissYouWidget({ currentUser, pairInfo }) {
 
   const currentUserId = currentUser?.uid || 'demo-user-1';
   const currentUserName = getNickname(currentUser?.displayName || currentUser?.email?.split('@')[0]);
-  const partnerName = getNickname(pairInfo?.user2?.name) || 'Partner';
+  const user2Name = getNickname(pairInfo?.user2?.name) || 'Partner';
+  // If I am user2, my partner is user1 (Jay). Otherwise partner is user2.
+  const partnerName = currentUserName === user2Name ? 'Jay' : user2Name;
 
   const todayKey = getTodayPHTKey();
   const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';

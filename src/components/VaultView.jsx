@@ -83,6 +83,15 @@ export default function VaultView({
         </div>
 
         <div className="relative z-10 max-w-3xl space-y-2">
+          {/* Time-based Greeting */}
+          <h1 className="text-lg sm:text-2xl lg:text-3xl font-handwriting text-[#F3E5AB]/90 tracking-wide">
+            {(() => {
+              const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })).getHours();
+              const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+              return `${greeting}, ${getNickname(currentUser?.displayName)}! ☀️`;
+            })()}
+          </h1>
+
           <div className="inline-flex items-center gap-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F3E5AB] text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full backdrop-blur-sm">
             <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D4AF37]" />
             <span>Time Capsule Vault • Sealed Until August 6, 2032</span>
@@ -153,7 +162,11 @@ export default function VaultView({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">
-              {getNickname(pairInfo?.user2?.name) || 'Partner'}'s
+              {(() => {
+                const u2 = getNickname(pairInfo?.user2?.name) || 'Partner';
+                const me = getNickname(currentUser?.displayName);
+                return me === u2 ? 'Jay' : u2;
+              })()}'s
             </p>
             <p className="text-xl sm:text-2xl font-bold font-serif text-[#36271C]">
               {partnerLetters.length} <span className="text-[10px] sm:text-xs font-normal text-rose-700 font-semibold">waiting</span>
