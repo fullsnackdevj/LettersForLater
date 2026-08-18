@@ -88,7 +88,8 @@ export default function VaultView({
             {(() => {
               const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })).getHours();
               const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
-              return `${greeting}, ${getNickname(currentUser?.displayName)}! ☀️`;
+              const icon = hour < 12 ? '☀️' : hour < 18 ? '🌤️' : '🌙';
+              return `${greeting}, ${getNickname(currentUser?.displayName)}! ${icon}`;
             })()}
           </h1>
 
