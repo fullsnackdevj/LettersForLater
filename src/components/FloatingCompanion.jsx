@@ -42,38 +42,26 @@ const LEFT_COMPANION_MESSAGES = [
 ];
 
 const RIGHT_COMPANION_MESSAGES = [
-  "Groom: Love, kumain ka na ba?",
-  "Bride: Oo naman! Ikaw ba? 😊",
-  "Groom: Hindi pa, hinihintay kita eh.",
-  "Bride: Hay nako, kain ka na! 😤💕",
-  "Groom: Sige na, para sayo.",
-  "Bride: Miss na kita agad...",
-  "Groom: Kanina lang tayo magkasama ah! 😂",
-  "Bride: E bakit parang ang tagal na?",
-  "Groom: Excited na ko sa wedding natin! 💍",
-  "Bride: Ako rin! Countdown na lang! ✨",
-  "Groom: Ikaw talaga pinaka maganda.",
-  "Bride: Sabi mo yan ha, wag mo babawiin! 😏",
-  "Groom: Hindi ko babawiin, ever.",
-  "Bride: Mahal kita, alam mo yun? 💕",
-  "Groom: Mahal na mahal din kita! ❤️",
-  "Bride: Wag ka mag papapuyat ha.",
-  "Groom: Ikaw din! Matulog ka na! 😴",
-  "Bride: Hindi pa, nag iisip pa ko ng vows.",
-  "Groom: Hala! Ako rin hindi pa tapos! 😅",
-  "Bride: Basta ikaw, simple lang. Totoo lang.",
-  "Groom: Sayo, lahat totoo naman eh.",
-  "Bride: Cheesy mo! Pero kilig naman. 🙈",
-  "Groom: Ready ka na ba maging Mrs.?",
-  "Bride: Since day one, ready na ko. 💍",
-  "Groom: Ingat ka palagi ha, love.",
-  "Bride: Ikaw din! Text mo ko pag nakauwi ka.",
-  "Groom: Promise, lagi naman. 🤞",
-  "Bride: Alam mo, blessed talaga ako sayo.",
-  "Groom: Ako nga yung blessed eh! 🙏",
-  "Bride: Tayo na lang mag argue kung sino mas blessed. 😂",
-  "Groom: Sige, I'll let you win this time. 😏",
-  "Bride: This time?? Palagi na lang! Haha 💕"
+  "Kiss: Akala ko noon, napakatagal ng panahon ng paghihintay para sa atin.",
+  "Jay: Pero pinili nating magtiwala sa Kanyang kalooban ngayon, Alam ko nang worth it ang lahat.",
+  "Kiss: Lahat ng dasal ko noon, akala ko hindi pinapakinggan.",
+  "Jay: Binibigyan ka lang pala ni Lord ng lalaking mag-aalaga sa'yo nang buong puso.",
+  "Kiss: Salamat at hindi ka napagod sa paghahanap at paghihintay.",
+  "Jay: Paano ako mapapagod kung alam kong ikaw ang dulo ng paghihintay na ito?",
+  "Kiss: Minsan naitanong ko kay Lord kung bakit ang tagal.",
+  "Jay: Ngayon, alam na natin—pinaghahanda lang Niya tayo para sa tamang panahon.",
+  "Kiss: Ang ganda ng kwento natin, kasi gawa ito ng Lord.",
+  "Jay: Dahil siya talaga ang sumulat nito mula pa noong una.",
+  "Kiss: Noong mga panahong malungkot ako, ikaw kaya ang pinagdarasal ko..",
+  "Jay: Sigurado ako, dahil ikaw rin ang laman ng bawat tahimik kong hiling.",
+  "Kiss: Akala ko dati hindi na darating ang para sa akin.",
+  "Jay: Naging subok lang ang tadhana para mas matutunan nating pahalagahan ang isa't isa.",
+  "Kiss: Walang pagsisisi sa lahat ng luha at paghihintay.",
+  "Jay: Dahil ang gantimpala ay ikaw—isang regalong galing mismo sa Kanya.",
+  "Kiss: Sino ang mag-akala na magtatagpo ang landas natin?",
+  "Jay: Walang aksidente kay Lord. Matagal na niyang plano ito.",
+  "Kiss: Masaya ako na sabay nating hinintay ang pangako Niya.",
+  "Jay: At ngayon, tutuparin na natin ang habambuhay na ito kasama si Lord."
 ];
 
 export default function FloatingCompanion({ currentUser, pairInfo }) {
@@ -102,7 +90,7 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
       } else if (pickSide > 0.65 && !rightBubbleMessage) {
         showRightMessage();
       }
-    }, 38000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [leftBubbleMessage, rightBubbleMessage]);
@@ -132,7 +120,7 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
     if (rightTimeoutRef.current) clearTimeout(rightTimeoutRef.current);
     rightTimeoutRef.current = setTimeout(() => {
       setRightBubbleMessage(null);
-    }, 5500);
+    }, 10000);
   };
 
   const triggerHaptic = () => {
