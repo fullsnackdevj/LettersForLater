@@ -42,21 +42,45 @@ const LEFT_COMPANION_MESSAGES = [
 ];
 
 const RIGHT_COMPANION_MESSAGES = [
-  "Hi Love! Nandito lang ako palagi :)",
-  "Miss you po sobra! ❤️",
-  "Don't forget to drink water! 💧",
-  "Galingan mo today ha! Proud of you!",
-  "Kain ka na po ng lunch/dinner :)",
-  "Sending you virtual hugs and kisses! 🤗",
-  "Pahinga ka rin pag napapagod ha.",
-  "I'm always cheering for you! ✨",
-  "Lagi kang mag-iingat please.",
-  "Counting down the days... ⏳",
-  "Mahal na mahal kita! 💕",
-  "Smile ka na, ang ganda ganda mo kaya :)"
+  "Groom: Love, kumain ka na ba?",
+  "Bride: Oo naman! Ikaw ba? 😊",
+  "Groom: Hindi pa, hinihintay kita eh.",
+  "Bride: Hay nako, kain ka na! 😤💕",
+  "Groom: Sige na, para sayo.",
+  "Bride: Miss na kita agad...",
+  "Groom: Kanina lang tayo magkasama ah! 😂",
+  "Bride: E bakit parang ang tagal na?",
+  "Groom: Excited na ko sa wedding natin! 💍",
+  "Bride: Ako rin! Countdown na lang! ✨",
+  "Groom: Ikaw talaga pinaka maganda.",
+  "Bride: Sabi mo yan ha, wag mo babawiin! 😏",
+  "Groom: Hindi ko babawiin, ever.",
+  "Bride: Mahal kita, alam mo yun? 💕",
+  "Groom: Mahal na mahal din kita! ❤️",
+  "Bride: Wag ka mag papapuyat ha.",
+  "Groom: Ikaw din! Matulog ka na! 😴",
+  "Bride: Hindi pa, nag iisip pa ko ng vows.",
+  "Groom: Hala! Ako rin hindi pa tapos! 😅",
+  "Bride: Basta ikaw, simple lang. Totoo lang.",
+  "Groom: Sayo, lahat totoo naman eh.",
+  "Bride: Cheesy mo! Pero kilig naman. 🙈",
+  "Groom: Ready ka na ba maging Mrs.?",
+  "Bride: Since day one, ready na ko. 💍",
+  "Groom: Ingat ka palagi ha, love.",
+  "Bride: Ikaw din! Text mo ko pag nakauwi ka.",
+  "Groom: Promise, lagi naman. 🤞",
+  "Bride: Alam mo, blessed talaga ako sayo.",
+  "Groom: Ako nga yung blessed eh! 🙏",
+  "Bride: Tayo na lang mag argue kung sino mas blessed. 😂",
+  "Groom: Sige, I'll let you win this time. 😏",
+  "Bride: This time?? Palagi na lang! Haha 💕"
 ];
 
 export default function FloatingCompanion({ currentUser, pairInfo }) {
+  // Determine if current user is Jay — left companion only shows for Kiss (partner)
+  const currentNickname = getNickname(currentUser?.displayName);
+  const isJay = currentNickname === 'Jay';
+
   // Left Companion (Jay with Lily) State
   const [leftBubbleMessage, setLeftBubbleMessage] = useState(null);
   const [isLeftBouncing, setIsLeftBouncing] = useState(false);
@@ -162,8 +186,9 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          LEFT COMPANION: Jay & Lily GIF Sprite
+          LEFT COMPANION: Jay & Lily GIF Sprite (Only visible to Kiss)
          ───────────────────────────────────────────────────────────── */}
+      {!isJay && (
       <aside aria-label="Floating Jay & Lily Companion" className="fixed bottom-0 left-[5px] z-40 flex flex-col items-start pointer-events-none select-none">
         
         {/* Left Speech Bubble */}
@@ -243,11 +268,12 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
         </div>
 
       </aside>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
-          RIGHT COMPANION: Jay Animated GIF Sprite (char-sprite-jay.gif)
+          RIGHT COMPANION: Bride & Groom Animated GIF Sprite (BRIDE-and-Groom.gif)
          ───────────────────────────────────────────────────────────── */}
-      <aside aria-label="Floating Jay Companion" className="fixed bottom-0 right-[12px] z-40 flex flex-col items-end pointer-events-none select-none">
+      <aside aria-label="Floating Bride & Groom Companion" className="fixed bottom-0 right-[12px] z-40 flex flex-col items-end pointer-events-none select-none">
         
         {/* Right Speech Bubble */}
         {rightBubbleMessage && (
@@ -304,23 +330,37 @@ export default function FloatingCompanion({ currentUser, pairInfo }) {
             className={`group relative cursor-pointer transition-transform duration-300 ${
               isRightBouncing ? 'scale-110 -translate-y-2' : 'hover:scale-105 active:scale-95'
             }`}
-            title="Tap Jay to say hi!"
+            title="Tap the couple to say hi!"
           >
             {/* Soft Ambient Glow */}
             <div className="absolute -inset-4 bg-gradient-to-r from-amber-300/35 via-rose-300/35 to-amber-300/35 rounded-full blur-2xl opacity-80 group-hover:opacity-100 transition-opacity" />
 
-            {/* Jay Animated GIF Sprite with exact matching height (flipped horizontally) */}
-            <div className="relative w-40 h-40 sm:w-56 sm:h-56 flex items-end justify-end filter drop-shadow-2xl">
+            {/* Bride & Groom Animated GIF Sprite */}
+            <div className="relative w-40 h-[180px] sm:w-56 sm:h-[232px] flex items-end justify-end filter drop-shadow-2xl">
               <img
-                src="/char-sprite-jay.gif"
-                alt="Jay Companion"
-                className="w-full h-full object-contain object-left-bottom pointer-events-none -scale-x-100"
+                src="/BRIDE-and-Groom.gif"
+                alt="Bride & Groom Companion"
+                className="w-full h-full object-contain object-right-bottom pointer-events-none"
+              />
+              {/* White Cat at the Groom's feet */}
+              <img
+                src="/white-cat.gif"
+                alt="White Cat"
+                className="absolute bottom-0 left-0 w-14 h-14 sm:w-[72px] sm:h-[72px] object-contain pointer-events-none drop-shadow-md"
+                style={{ transform: 'translate(-20%, 5%)' }}
+              />
+              {/* Black Cat at the Bride's left foot */}
+              <img
+                src="/blackCAT.gif"
+                alt="Black Cat"
+                className="absolute bottom-0 right-0 w-14 h-14 sm:w-[72px] sm:h-[72px] object-contain pointer-events-none drop-shadow-md"
+                style={{ transform: 'translate(20%, 5%)' }}
               />
             </div>
 
             {/* Little tap badge */}
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-[#4A1010]/90 text-[#F8E3B6] border border-[#D4AF37]/50 text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Tap Jay! ✨
+              Tap us! 💍
             </div>
           </div>
         </div>
