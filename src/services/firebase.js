@@ -257,6 +257,31 @@ export async function saveLetterToCloud(letter) {
   const letterId = letter.id || tempId;
   const processedImages = await uploadImagesToStorage(letter.images, pairId, letterId);
 
+  // Strictly preserve original creation timestamp when updating/sealing a draft
+  let preservedCreatedAtPHT = letter.createdAtPHT;
+  let preservedCreatedAtIso = letter.createdAtIso;
+
+  if (!isNew && (!preservedCreatedAtPHT || !preservedCreatedAtIso)) {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDoc(doc(db, 'letters', letter.id));
+        if (snap.exists()) {
+          const data = snap.data();
+          preservedCreatedAtPHT = preservedCreatedAtPHT || data.createdAtPHT;
+          preservedCreatedAtIso = preservedCreatedAtIso || data.createdAtIso;
+        }
+      } catch (err) {
+        console.warn('Could not fetch existing letter timestamp:', err);
+      }
+    } else {
+      const local = getLocalLetters().find(l => l.id === letter.id);
+      if (local) {
+        preservedCreatedAtPHT = preservedCreatedAtPHT || local.createdAtPHT;
+        preservedCreatedAtIso = preservedCreatedAtIso || local.createdAtIso;
+      }
+    }
+  }
+
   const letterDoc = {
     pairId: letter.pairId || '#JayFinallyGotAKiss',
     authorId: letter.authorId,
@@ -275,9 +300,10 @@ export async function saveLetterToCloud(letter) {
       height: img.height || 0
     })),
     isDraft: Boolean(letter.isDraft),
-    // IMMUTABLE PHT Creation Timestamp (Preserved if editing)
-    createdAtPHT: letter.createdAtPHT || pht.fullString,
-    createdAtIso: letter.createdAtIso || pht.isoString
+    // IMMUTABLE PHT Creation Timestamp (Strictly preserved from original draft moment)
+    createdAtPHT: preservedCreatedAtPHT || pht.fullString,
+    createdAtIso: preservedCreatedAtIso || pht.isoString,
+    lastSavedAtPHT: pht.fullString
   };
 
   if (isFirebaseConfigured && db) {
@@ -370,7 +396,8 @@ export async function recordMissYou(pairCode, user, dateKey) {
         [`count_${userId}`]: 1,
         lastTappedBy: userId,
         lastTappedByName: userName,
-        lastTappedAt: timestamp
+        lastTappedAt: timestamp,
+        [`lastTapAt_${userId}`]: timestamp
       });
     } else {
       await updateDoc(missRef, {
@@ -378,7 +405,8 @@ export async function recordMissYou(pairCode, user, dateKey) {
         [`count_${userId}`]: increment(1),
         lastTappedBy: userId,
         lastTappedByName: userName,
-        lastTappedAt: timestamp
+        lastTappedAt: timestamp,
+        [`lastTapAt_${userId}`]: timestamp
       });
     }
     return;
@@ -393,6 +421,7 @@ export async function recordMissYou(pairCode, user, dateKey) {
   data.lastTappedBy = userId;
   data.lastTappedByName = userName;
   data.lastTappedAt = timestamp;
+  data[`lastTapAt_${userId}`] = timestamp;
   localStorage.setItem(key, JSON.stringify(data));
 }
 

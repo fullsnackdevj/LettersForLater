@@ -87,8 +87,9 @@ export default function LetterEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   
-  // Immutable PHT Creation Timestamp State
+  // Immutable PHT & ISO Creation Timestamp State (Preserved from original draft moment)
   const [phtStamp, setPhtStamp] = useState('');
+  const [isoStamp, setIsoStamp] = useState('');
 
   useEffect(() => {
     if (existingLetter) {
@@ -99,12 +100,14 @@ export default function LetterEditorModal({
       setMood(existingLetter.mood || 'Warm & Hopeful');
       setImages(existingLetter.images || []);
       setIsDraft(Boolean(existingLetter.isDraft));
-      // Preserve original immutable PHT timestamp
+      // Preserve original immutable PHT & ISO timestamps from when it was first drafted
       setPhtStamp(existingLetter.createdAtPHT || getCurrentPHT().fullString);
+      setIsoStamp(existingLetter.createdAtIso || getCurrentPHT().isoString);
     } else {
-      // New Letter: generate fresh initial PHT timestamp
-      const freshPht = getCurrentPHT().fullString;
-      setPhtStamp(freshPht);
+      // New Letter / Draft: generate fresh initial PHT & ISO timestamp once
+      const phtNow = getCurrentPHT();
+      setPhtStamp(phtNow.fullString);
+      setIsoStamp(phtNow.isoString);
       setTitle('');
       setContent('');
       setIsVeryImportant(false);
@@ -158,8 +161,9 @@ export default function LetterEditorModal({
         mood,
         images,
         isDraft: saveAsDraft,
-        // Immutable initial creation PHT stamp
-        createdAtPHT: phtStamp
+        // Immutable initial creation PHT and ISO stamp (preserved from first draft)
+        createdAtPHT: phtStamp,
+        createdAtIso: isoStamp
       });
       onClose();
     } catch (err) {
@@ -186,12 +190,12 @@ export default function LetterEditorModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold font-serif-vintage text-[#36271C] truncate">
-                {existingLetter ? 'Edit Your Sealed Letter' : 'Compose Letter for Later'}
+                {existingLetter ? (existingLetter.isDraft ? 'Resume Draft Letter' : 'Edit Your Sealed Letter') : 'Compose Letter for Later'}
               </h2>
               {/* Immutable PHT Stamp Notice */}
               <div className="flex items-center gap-1 text-[11px] sm:text-xs text-[#8B0000] font-mono mt-0.5 flex-wrap">
                 <Clock className="w-3 h-3 shrink-0" />
-                <span>Timestamp: <strong>{phtStamp}</strong> (Locked)</span>
+                <span>Written on: <strong>{phtStamp}</strong> (Preserved)</span>
               </div>
             </div>
           </div>

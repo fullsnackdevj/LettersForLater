@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Sparkles, AlertTriangle, Timer } from 'lucide-react';
+import { Heart, Sparkles, AlertTriangle, Timer, Clock } from 'lucide-react';
 import { recordMissYou, subscribeToDailyMisses } from '../services/firebase';
 import { getTodayPHTKey } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -81,9 +81,61 @@ export default function MissYouWidget({ currentUser, pairInfo }) {
     }, 1000);
   }, []);
 
+  // Tick state to refresh relative timestamps every 30s
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Relative time-ago helper
+  const timeAgo = (isoString) => {
+    if (!isoString) return null;
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    if (diffMs < 0) return 'just now';
+    const secs = Math.floor(diffMs / 1000);
+    if (secs < 30) return 'just now';
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}min${mins > 1 ? 's' : ''} ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}hr${hrs > 1 ? 's' : ''} ago`;
+    return 'earlier today';
+  };
+
   // Derived count metrics
-  const myCount = missData[`count_${currentUserId}`] || 0;
-  const partnerCount = Math.max(0, (missData.total || 0) - myCount);
+  const myCount = (missData && missData[`count_${currentUserId}`]) || 0;
+  const partnerCount = Math.max(0, ((missData && missData.total) || 0) - myCount);
+
+  // Derive per-user last-tap timestamps from missData
+  const myLastTapAt = (missData && missData[`lastTapAt_${currentUserId}`]) || null;
+  // Find the partner's last tap by scanning for lastTapAt_ keys that aren't ours
+  const partnerLastTapAt = (() => {
+    if (!missData) return null;
+    const keys = Object.keys(missData).filter(k =>
+      k.startsWith('lastTapAt_') && k !== `lastTapAt_${currentUserId}`
+    );
+    if (keys.length > 0) {
+      const timestamps = keys.map(k => missData[k]).filter(Boolean);
+      if (timestamps.length > 0) {
+        timestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        return timestamps[0];
+      }
+    }
+    // Fallback: if partner hasn't tapped with new field but overall lastTappedBy isn't us
+    if (missData.lastTappedBy && missData.lastTappedBy !== currentUserId) {
+      return missData.lastTappedAt || null;
+    }
+    return null;
+  })();
+
+  // Build the partner status string
+  const partnerAgo = timeAgo(partnerLastTapAt);
+  const partnerStatus = partnerAgo
+    ? `${partnerName}'s last tap was ${partnerAgo}`
+    : ((missData && missData.total > 0) && partnerCount > 0)
+      ? `${partnerName} tapped earlier today`
+      : `${partnerName} hasn't tapped yet today`;
 
   // Tap Handler - Increments count & triggers particle animation
   const handleTap = async () => {
@@ -190,10 +242,17 @@ export default function MissYouWidget({ currentUser, pairInfo }) {
           Thinking Of You Today
         </h3>
 
+        {/* Last Tap Status — shows your partner's last tap */}
+        <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs text-[#9E8B75] font-medium mt-0.5">
+          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#C4A882]" />
+          <span>{partnerStatus}</span>
+        </div>
+
         <p className="hidden sm:block text-[#7A6855] font-handwriting text-xl sm:text-2xl">
           "Tap the heart whenever you catch yourself missing each other."
         </p>
       </div>
+
 
       {/* Center Interactive Layout: You Count | Circular Wax Seal | Partner Count */}
       <div className="relative z-10 flex items-center justify-center gap-3 sm:gap-8 py-1">
