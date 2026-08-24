@@ -11,6 +11,10 @@ import UnlockTimelineModal from './components/UnlockTimelineModal';
 import AppLockModal from './components/AppLockModal';
 import InfoModal from './components/InfoModal';
 import FloatingCompanion from './components/FloatingCompanion';
+import StoryCreatorModal from './components/StoryCreatorModal';
+import StoryViewerModal from './components/StoryViewerModal';
+import StoryArchiveModal from './components/StoryArchiveModal';
+import StoryIntroModal from './components/StoryIntroModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -22,7 +26,12 @@ import {
   saveLetterToCloud, 
   deleteLetterFromCloud, 
   subscribeToLetters,
-  subscribeToPairInfo
+  subscribeToPairInfo,
+  saveStoryToCloud,
+  subscribeToStories,
+  reactToStory,
+  markStoryAsViewed,
+  deleteStoryFromCloud
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -35,6 +44,7 @@ export default function App() {
     user2: { name: 'Partner' }
   });
   const [letters, setLetters] = useState([]);
+  const [stories, setStories] = useState([]);
 
   // App Startup Gatekeeper Lock State
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
@@ -49,6 +59,22 @@ export default function App() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isUnlockTimelineOpen, setIsUnlockTimelineOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+  // Our Stories Modals
+  const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false);
+  const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
+  const [isStoryArchiveOpen, setIsStoryArchiveOpen] = useState(false);
+  const [isStoryIntroOpen, setIsStoryIntroOpen] = useState(false);
+  const [storyIntroPendingAction, setStoryIntroPendingAction] = useState(null);
+  const [hasSeenStoriesIntro, setHasSeenStoriesIntro] = useState(() => {
+    try {
+      return localStorage.getItem('lfl_seen_stories_intro_v2') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [viewerStories, setViewerStories] = useState([]);
+  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -85,7 +111,14 @@ export default function App() {
     return () => unsubscribe();
   }, [pairInfo?.code, user?.uid]);
 
-
+  // Subscribe to Realtime Stories ("Our Stories")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToStories(pairCode, (fetchedStories) => {
+      setStories(fetchedStories);
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
 
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
 
@@ -100,7 +133,7 @@ export default function App() {
 
   const isLettersUnlocked = countdown.isUnlocked && hasMatchingUnlockCodes();
 
-  // Handlers
+  // Letter Handlers
   const handleSaveLetter = async (letterData) => {
     const saved = await saveLetterToCloud(letterData);
     setLetters(prev => {
@@ -124,6 +157,79 @@ export default function App() {
     setPairInfo(updated);
   };
 
+  // Story Handlers
+  const handleSaveStory = async (storyData) => {
+    const saved = await saveStoryToCloud(storyData);
+    setStories(prev => {
+      const idx = prev.findIndex(s => s.id === saved.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = saved;
+        return copy;
+      }
+      return [saved, ...prev];
+    });
+  };
+
+  const handleDeleteStory = async (storyId) => {
+    await deleteStoryFromCloud(pairInfo?.code || '#JayFinallyGotAKiss', storyId);
+    setStories(prev => prev.filter(s => s.id !== storyId));
+    setViewerStories(prev => prev.filter(s => s.id !== storyId));
+  };
+
+  const handleReactToStory = async (storyId, emoji) => {
+    await reactToStory(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user, emoji);
+  };
+
+  const handleMarkStoryAsViewed = async (storyId) => {
+    if (!storyId || !user) return;
+    await markStoryAsViewed(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user);
+  };
+
+  const handleOpenStoryAsLetter = (story) => {
+    if (!story) return;
+    setIsStoryViewerOpen(false);
+    
+    // Create pre-filled letter draft with the story snapshot photo attached
+    const storyLetter = {
+      pairId: pairInfo?.code || '#JayFinallyGotAKiss',
+      authorId: user?.uid || 'demo-user-1',
+      authorName: user?.displayName || 'Jay',
+      authorPhoto: user?.photoURL || '',
+      title: `Story Moment (${story.createdAtPHT ? story.createdAtPHT.split(', ')[0] : '2026'})`,
+      content: '',
+      isVeryImportant: false,
+      importantTagReason: '',
+      mood: 'Warm & Hopeful',
+      images: story.mediaUrl ? [{
+        storageUrl: story.mediaUrl,
+        name: `story_moment_${Date.now()}.jpg`,
+        sizeKb: 0
+      }] : [],
+      isDraft: false
+    };
+
+    setSelectedLetter(storyLetter);
+    setIsEditorOpen(true);
+  };
+
+  const handleWithIntroCheck = (actionFn) => {
+    if (!hasSeenStoriesIntro) {
+      setStoryIntroPendingAction(() => actionFn);
+      setIsStoryIntroOpen(true);
+    } else if (actionFn) {
+      actionFn();
+    }
+  };
+
+  const handleOpenStoryViewerWithStories = (storiesToView, startIndex = 0) => {
+    handleWithIntroCheck(() => {
+      setViewerStories(storiesToView);
+      setViewerInitialIndex(startIndex);
+      setIsStoryViewerOpen(true);
+    });
+  };
+
   const handleTimelineButtonClick = () => {
     if (!countdown.isUnlocked) {
       return; // Disabled before 2032
@@ -144,15 +250,25 @@ export default function App() {
         <MusicPlayer audioSrc="/Tugon (The Wedding Version).mp3" songTitle="Tugon (The Wedding Version)" />
       )}
 
-      {/* Top Navbar */}
+      {/* Top Navbar with integrated Our Stories */}
       <Navbar
         user={user}
         pairInfo={pairInfo}
         isLettersUnlocked={isLettersUnlocked}
+        stories={stories}
+        hasSeenStoriesIntro={hasSeenStoriesIntro}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
         onOpenInfo={() => setIsInfoOpen(true)}
         onSignOut={() => signOutUser()}
+        onOpenStoryViewer={handleOpenStoryViewerWithStories}
+        onOpenStoryCreator={() => {
+          handleWithIntroCheck(() => {
+            setIsStoryCreatorOpen(true);
+          });
+        }}
+        onOpenStoryArchive={() => setIsStoryArchiveOpen(true)}
+        onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
       />
 
       {/* View Switcher Bar (Vault vs Timeline) */}
@@ -318,6 +434,61 @@ export default function App() {
         }}
       />
 
+      {/* Story Creator Modal */}
+      <StoryCreatorModal
+        isOpen={isStoryCreatorOpen}
+        onClose={() => setIsStoryCreatorOpen(false)}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onSaveStory={handleSaveStory}
+      />
+
+      {/* Story Viewer Modal */}
+      <StoryViewerModal
+        isOpen={isStoryViewerOpen}
+        onClose={() => setIsStoryViewerOpen(false)}
+        stories={viewerStories}
+        initialStoryIndex={viewerInitialIndex}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onReact={handleReactToStory}
+        onDeleteStory={handleDeleteStory}
+        onOpenAsLetter={handleOpenStoryAsLetter}
+        onMarkAsViewed={handleMarkStoryAsViewed}
+      />
+
+      {/* Story Archive / Memory Log Modal */}
+      <StoryArchiveModal
+        isOpen={isStoryArchiveOpen}
+        onClose={() => setIsStoryArchiveOpen(false)}
+        stories={stories}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onSelectStory={(story) => {
+          handleOpenStoryViewerWithStories([story], 0);
+        }}
+        onOpenCreateStory={() => {
+          setIsStoryArchiveOpen(false);
+          setIsStoryCreatorOpen(true);
+        }}
+      />
+
+      {/* Story Intro / Feature Guide Modal */}
+      <StoryIntroModal
+        isOpen={isStoryIntroOpen}
+        onClose={() => {
+          setIsStoryIntroOpen(false);
+          setStoryIntroPendingAction(null);
+        }}
+        onProceed={() => {
+          setHasSeenStoriesIntro(true);
+          if (storyIntroPendingAction) {
+            storyIntroPendingAction();
+            setStoryIntroPendingAction(null);
+          }
+        }}
+      />
+
       {/* App Startup Gatekeeper Lock Modal */}
       <AppLockModal
         isOpen={!isAppUnlocked}
@@ -338,4 +509,3 @@ export default function App() {
     </div>
   );
 }
-

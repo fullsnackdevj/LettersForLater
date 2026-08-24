@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Star, Trash2, Edit, ZoomIn, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  X, 
+  Clock, 
+  Star, 
+  Trash2, 
+  Edit, 
+  ZoomIn, 
+  Heart, 
+  ChevronLeft, 
+  ChevronRight, 
+  Download, 
+  Check,
+  AlertTriangle 
+} from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
+import { downloadImage } from '../utils/fileDownloader';
 
 export default function LetterDetailModal({ 
   letter, 
@@ -11,14 +25,24 @@ export default function LetterDetailModal({
   onDelete 
 }) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   
+  // Custom Delete Confirmation Modal State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Touch Swipe Gesture State
   const [touchStartX, setTouchStartX] = useState(0);
   const [touchEndX, setTouchEndX] = useState(0);
 
   useEffect(() => {
-    // Reset photo index when modal closes or letter changes
-    if (!isOpen) setActivePhotoIndex(null);
+    // Reset photo index & dialog when modal closes or letter changes
+    if (!isOpen) {
+      setActivePhotoIndex(null);
+      setDownloadSuccess(false);
+      setShowDeleteConfirm(false);
+    }
   }, [isOpen, letter]);
 
   // Keyboard navigation listener for full screen lightbox
@@ -28,8 +52,10 @@ export default function LetterDetailModal({
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight') {
         setActivePhotoIndex((prev) => (prev + 1) % letter.images.length);
+        setDownloadSuccess(false);
       } else if (e.key === 'ArrowLeft') {
         setActivePhotoIndex((prev) => (prev - 1 + letter.images.length) % letter.images.length);
+        setDownloadSuccess(false);
       } else if (e.key === 'Escape') {
         setActivePhotoIndex(null);
       }
@@ -48,12 +74,14 @@ export default function LetterDetailModal({
     e?.stopPropagation();
     if (!images.length) return;
     setActivePhotoIndex((prev) => (prev + 1) % images.length);
+    setDownloadSuccess(false);
   };
 
   const handlePrevPhoto = (e) => {
     e?.stopPropagation();
     if (!images.length) return;
     setActivePhotoIndex((prev) => (prev - 1 + images.length) % images.length);
+    setDownloadSuccess(false);
   };
 
   const handleTouchStart = (e) => {
@@ -68,13 +96,29 @@ export default function LetterDetailModal({
   const handleTouchEnd = () => {
     if (!images.length) return;
     const diff = touchStartX - touchEndX;
-    // Swipe Threshold: 50px
     if (diff > 50) {
-      // Swiped Left -> Next Photo
       handleNextPhoto();
     } else if (diff < -50) {
-      // Swiped Right -> Previous Photo
       handlePrevPhoto();
+    }
+  };
+
+  const handleDownloadPhoto = async (e, img) => {
+    e?.stopPropagation();
+    const photoUrl = img?.storageUrl || img?.dataUrl;
+    if (!photoUrl) return;
+
+    setIsDownloading(true);
+    const fileName = img?.name || `letter_photo_${Date.now()}.jpg`;
+    
+    try {
+      await downloadImage(photoUrl, fileName);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
+    } catch (err) {
+      console.error('Error downloading letter photo:', err);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -120,12 +164,7 @@ export default function LetterDetailModal({
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete this letter?')) {
-                      onDelete(letter.id);
-                      onClose();
-                    }
-                  }}
+                  onClick={() => setShowDeleteConfirm(true)}
                   className="p-2 text-rose-700 hover:text-rose-900 rounded-lg hover:bg-rose-50 transition-colors"
                   title="Delete Letter"
                 >
@@ -142,6 +181,69 @@ export default function LetterDetailModal({
             </button>
           </div>
         </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            CUSTOM DELETE CONFIRMATION DIALOG MODAL
+           ───────────────────────────────────────────────────────────── */}
+        {showDeleteConfirm && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#FAF5EC] border-2 border-[#E2D7C7] rounded-3xl p-6 text-center max-w-sm w-full space-y-4 shadow-2xl">
+              <div className="w-14 h-14 rounded-full bg-rose-100 border border-rose-300 text-rose-700 flex items-center justify-center mx-auto shadow-sm">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="font-serif-vintage font-bold text-lg text-[#36271C]">
+                  Delete this Letter?
+                </h3>
+                <p className="text-xs text-[#7A6855] leading-relaxed">
+                  Are you sure you want to delete <strong className="text-[#36271C]">"{letter.title || 'Untitled Letter'}"</strong>? This sealed memory and all its attached photos will be permanently removed from your vault.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 pt-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 rounded-xl border border-[#D2C3B0] bg-white text-xs font-bold text-[#5C4A3A] hover:bg-[#EFE9DE] transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (!letter?.id || !onDelete) return;
+                    setIsDeleting(true);
+                    try {
+                      await onDelete(letter.id);
+                      setIsDeleting(false);
+                      setShowDeleteConfirm(false);
+                      onClose();
+                    } catch (err) {
+                      console.error('Error deleting letter:', err);
+                      setIsDeleting(false);
+                      alert('Failed to delete letter. Please try again.');
+                    }
+                  }}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 border border-[#D4AF37]/50 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <div className="w-3.5 h-3.5 border-2 border-[#F8E3B6] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Letter</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Body - Stationary Parchment */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 stationery-sheet">
@@ -188,7 +290,7 @@ export default function LetterDetailModal({
                   Photo Gallery ({images.length})
                 </h4>
                 <span className="text-[11px] text-[#9E8B75] italic">
-                  Click to open interactive gallery
+                  Tap to open & download
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -196,7 +298,7 @@ export default function LetterDetailModal({
                   <div
                     key={i}
                     onClick={() => setActivePhotoIndex(i)}
-                    className="polaroid-card cursor-pointer group p-2"
+                    className="polaroid-card cursor-pointer group p-2 relative"
                   >
                     <div className="relative overflow-hidden rounded">
                       <img
@@ -204,9 +306,18 @@ export default function LetterDetailModal({
                         alt={img.name}
                         className="w-full h-36 object-cover transition-transform group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
-                        <ZoomIn className="w-6 h-6" />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 text-white transition-opacity">
+                        <ZoomIn className="w-5 h-5" />
                       </div>
+
+                      {/* Direct Quick Download Icon Button on thumbnail */}
+                      <button
+                        onClick={(e) => handleDownloadPhoto(e, img)}
+                        className="absolute bottom-1.5 right-1.5 p-1.5 bg-black/60 hover:bg-[#A83232] text-white rounded-full transition-colors shadow-md opacity-0 group-hover:opacity-100"
+                        title="Download Photo"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     <p className="mt-2 text-[10px] text-center font-handwriting text-sm text-[#4A3B2C] truncate">
                       {img.name}
@@ -231,7 +342,7 @@ export default function LetterDetailModal({
 
       </div>
 
-      {/* Interactive Photo Gallery Lightbox Modal with Touch Swipe & Nav Controls */}
+      {/* Interactive Photo Gallery Lightbox Modal with Download, Touch Swipe & Nav Controls */}
       {activePhotoIndex !== null && images[activePhotoIndex] && (
         <div 
           onClick={() => setActivePhotoIndex(null)}
@@ -241,13 +352,33 @@ export default function LetterDetailModal({
           className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3 sm:p-6 animate-fadeIn"
         >
           {/* Top Gallery Header Bar */}
-          <div className="w-full max-w-4xl flex items-center justify-between text-white pb-3 px-2">
-            <span className="text-xs font-mono bg-white/10 px-3 py-1 rounded-full border border-white/20">
-              Photo {activePhotoIndex + 1} of {images.length}
-            </span>
+          <div className="w-full max-w-4xl flex items-center justify-between text-white pb-3 px-2 gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                Photo {activePhotoIndex + 1} of {images.length}
+              </span>
+
+              {/* Download Photo Button in Top Bar */}
+              <button
+                type="button"
+                onClick={(e) => handleDownloadPhoto(e, images[activePhotoIndex])}
+                disabled={isDownloading}
+                className="flex items-center gap-1.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/50 px-3.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-md"
+                title="Save this photo to your device"
+              >
+                {isDownloading ? (
+                  <div className="w-3.5 h-3.5 border-2 border-[#F8E3B6] border-t-transparent rounded-full animate-spin" />
+                ) : downloadSuccess ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                <span>{downloadSuccess ? 'Downloaded!' : 'Save Photo'}</span>
+              </button>
+            </div>
             
             <p className="text-xs text-white/70 hidden sm:block font-sans">
-              Swipe left/right or use arrow keys to view
+              Swipe left/right or use arrow keys
             </p>
 
             <button
@@ -284,11 +415,23 @@ export default function LetterDetailModal({
                 alt={images[activePhotoIndex].name || 'Memory Photo'}
                 className="max-w-full max-h-[65vh] sm:max-h-[75vh] object-contain rounded"
               />
-              <div className="mt-3 flex items-center justify-between px-1">
-                <p className="text-center font-handwriting text-lg sm:text-xl text-[#36271C] flex items-center gap-1.5 mx-auto">
-                  <span>{images[activePhotoIndex].name || 'Memory Snapshot'}</span>
-                  <Heart className="w-4 h-4 text-rose-500 fill-current shrink-0" />
+              <div className="mt-3 flex items-center justify-between px-2 gap-2">
+                <p className="font-handwriting text-base sm:text-xl text-[#36271C] truncate max-w-[200px] sm:max-w-md">
+                  {images[activePhotoIndex].name || 'Memory Snapshot'}
                 </p>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleDownloadPhoto(e, images[activePhotoIndex])}
+                    className="flex items-center gap-1 text-xs font-bold text-[#A83232] hover:text-[#8B0000] bg-[#FAF5EC] border border-[#D2C3B0] px-2.5 py-1 rounded-lg transition-colors shadow-xs"
+                    title="Download this photo"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Save</span>
+                  </button>
+                  <Heart className="w-4 h-4 text-rose-500 fill-current shrink-0" />
+                </div>
               </div>
             </div>
 
@@ -315,7 +458,10 @@ export default function LetterDetailModal({
               {images.map((img, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setActivePhotoIndex(idx)}
+                  onClick={() => {
+                    setActivePhotoIndex(idx);
+                    setDownloadSuccess(false);
+                  }}
                   className={`relative shrink-0 rounded-lg overflow-hidden transition-all ${
                     idx === activePhotoIndex
                       ? 'ring-2 ring-amber-400 scale-105 opacity-100'
@@ -338,4 +484,3 @@ export default function LetterDetailModal({
     </div>
   );
 }
-

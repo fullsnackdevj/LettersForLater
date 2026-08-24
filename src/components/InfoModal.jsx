@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Lock, Sparkles, Heart, Clock, Mail, Key, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Sparkles, Heart, Clock, Mail, Key, HelpCircle, CheckCircle2, Camera, BookOpen } from 'lucide-react';
 
 export default function InfoModal({ isOpen, onClose }) {
   if (!isOpen) return null;
@@ -85,12 +85,27 @@ export default function InfoModal({ isOpen, onClose }) {
 
           {/* Step 4 */}
           <div className="bg-[#FAF5EC] border border-[#E2D7C7] p-4 rounded-2xl flex items-start gap-3.5 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-purple-100/80 border border-purple-300/80 flex items-center justify-center text-purple-700 shrink-0">
+              <Camera className="w-5 h-5 text-[#A83232]" />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs sm:text-sm text-[#36271C] flex items-center gap-1.5">
+                <span>4. 24h Daily Stories & Memory Log</span>
+              </h4>
+              <p className="text-xs text-[#5C4A3A] mt-1 leading-relaxed">
+                Post 24-hour photo snapshots of your day with pure emoji mood stamps. All photos are automatically kept in your private Memory Log (📖) and can be saved as 2032 letters anytime.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 5 */}
+          <div className="bg-[#FAF5EC] border border-[#E2D7C7] p-4 rounded-2xl flex items-start gap-3.5 shadow-xs">
             <div className="w-9 h-9 rounded-xl bg-amber-100/80 border border-amber-300/80 flex items-center justify-center text-[#D4AF37] shrink-0">
               <Key className="w-5 h-5 text-amber-700" />
             </div>
             <div>
               <h4 className="font-bold text-xs sm:text-sm text-[#36271C] flex items-center gap-1.5">
-                <span>4. Unlocking Together in 2032</span>
+                <span>5. Unlocking Together in 2032</span>
               </h4>
               <p className="text-xs text-[#5C4A3A] mt-1 leading-relaxed">
                 On <strong>August 6, 2032</strong> (or when both of you enter your secret unlock codes), the vault unlocks to reveal all sealed memories!

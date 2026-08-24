@@ -195,3 +195,80 @@
   }
 }
 
+/* Our Stories (Instagram Story Feature) Styles */
+@keyframes storyRingSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.story-ring-glow {
+  background: conic-gradient(from 0deg, #D4AF37, #A83232, #E0A96D, #D4AF37);
+  animation: storyRingSpin 6s linear infinite;
+}
+
+.story-ring-glow:hover {
+  animation-duration: 2.5s;
+}
+
+@keyframes storyGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px rgba(168, 50, 50, 0.45);
+  }
+}
+
+.animate-story-pulse {
+  animation: storyGlowPulse 2.5s infinite ease-in-out;
+}
+
+/* First-Time New Feature Attention Ring & Pulse */
+@keyframes firstTimeGlowPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.8), 0 0 10px rgba(168, 50, 50, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(212, 175, 55, 0), 0 0 18px 5px rgba(212, 175, 55, 0.65);
+    transform: scale(1.06);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0), 0 0 10px rgba(168, 50, 50, 0.4);
+    transform: scale(1);
+  }
+}
+
+.first-time-feature-glow {
+  animation: firstTimeGlowPulse 2s infinite ease-in-out;
+  border-radius: 9999px;
+}
+
+/* Story Background Presets for Text Notes */
+.story-bg-parchment {
+  background-color: #FAF5EC;
+  background-image: radial-gradient(#E8DFD1 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+.story-bg-wine {
+  background: linear-gradient(145deg, #4A1010 0%, #2A0808 60%, #1A0404 100%);
+}
+
+.story-bg-sunset {
+  background: linear-gradient(160deg, #E07A5F 0%, #D4AF37 50%, #814343 100%);
+}
+
+.story-bg-night {
+  background: linear-gradient(170deg, #1C1D24 0%, #0F1015 60%, #2D1B36 100%);
+}
+
+.story-bg-rose {
+  background: linear-gradient(135deg, #FDE2E4 0%, #FFCAD4 40%, #B5838D 100%);
+}
+
+.story-bg-sage {
+  background: linear-gradient(135deg, #E9ECE7 0%, #C7D3C0 50%, #6E886D 100%);
+}
+
+

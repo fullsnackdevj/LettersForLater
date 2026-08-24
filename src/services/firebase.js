@@ -45,9 +45,39 @@ if (isFirebaseConfigured) {
 const LOCAL_USER_KEY = 'lettersforlater_user';
 const LOCAL_PAIR_KEY = 'lettersforlater_pair';
 const LOCAL_LETTERS_KEY = 'lettersforlater_letters';
+const LOCAL_STORIES_KEY = 'lettersforlater_stories';
 
 // In-Memory Storage Cache backed by localStorage
 let inMemoryLettersStore = null;
+let inMemoryStoriesStore = null;
+
+function getLocalStories() {
+  if (inMemoryStoriesStore !== null) {
+    return inMemoryStoriesStore;
+  }
+  try {
+    const data = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORIES_KEY) : null;
+    if (data) {
+      inMemoryStoriesStore = JSON.parse(data);
+      return inMemoryStoriesStore;
+    }
+  } catch (e) {
+    console.warn('Error reading stories from localStorage:', e);
+  }
+  inMemoryStoriesStore = [];
+  return inMemoryStoriesStore;
+}
+
+function saveLocalStories(stories) {
+  inMemoryStoriesStore = [...stories];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STORIES_KEY, JSON.stringify(stories));
+    }
+  } catch (e) {
+    console.warn('LocalStorage quota or write error for stories:', e);
+  }
+}
 
 function getLocalLetters() {
   if (inMemoryLettersStore !== null) {
@@ -451,5 +481,206 @@ export function subscribeToDailyMisses(pairCode, dateKey, callback) {
 
   return () => clearInterval(pollInterval);
 }
+
+/**
+ * Our Stories (24-Hour Daily Moments & Archive) Services
+ */
+export async function saveStoryToCloud(story) {
+  const pht = getCurrentPHT();
+  const cleanPairCode = (story.pairId || '#JayFinallyGotAKiss').toUpperCase();
+  const tempId = `story-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const storyId = story.id || tempId;
+
+  // Expiration: 24 hours from creation
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  let mediaUrl = story.mediaUrl || '';
+  if (story.dataUrl) {
+    if (isFirebaseConfigured && storage) {
+      try {
+        const fileName = `story_${storyId}_${Date.now()}.jpg`;
+        const storageRef = ref(storage, `letters/${cleanPairCode}/stories/${fileName}`);
+        await uploadString(storageRef, story.dataUrl, 'data_url');
+        mediaUrl = await getDownloadURL(storageRef);
+      } catch (err) {
+        console.error('Error uploading story image to Storage:', err);
+        mediaUrl = story.dataUrl; // fallback
+      }
+    } else {
+      mediaUrl = story.dataUrl;
+    }
+  }
+
+  const storyDoc = {
+    pairId: cleanPairCode,
+    authorId: story.authorId || 'demo-user-1',
+    authorName: story.authorName || 'Jay',
+    authorPhoto: story.authorPhoto || '',
+    type: story.type || (mediaUrl ? 'photo' : 'text'),
+    mediaUrl: mediaUrl,
+    backgroundStyle: story.backgroundStyle || 'parchment',
+    fontStyle: story.fontStyle || 'handwriting',
+    caption: story.caption || '',
+    moodTag: story.moodTag || '',
+    createdAtPHT: story.createdAtPHT || pht.fullString,
+    createdAtIso: story.createdAtIso || pht.isoString,
+    expiresAtIso: story.expiresAtIso || expiresAt,
+    reactions: story.reactions || {},
+    viewedBy: Array.isArray(story.viewedBy) ? story.viewedBy : [story.authorId || 'demo-user-1'],
+    isArchivedToVault: Boolean(story.isArchivedToVault)
+  };
+
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanPairCode, 'stories', storyId);
+    await setDoc(docRef, {
+      ...storyDoc,
+      serverTime: serverTimestamp()
+    }, { merge: true });
+    return { id: storyId, ...storyDoc };
+  }
+
+  // Local storage fallback
+  const localStories = getLocalStories();
+  const newStory = { id: storyId, ...storyDoc };
+  const idx = localStories.findIndex(s => s.id === storyId);
+  if (idx >= 0) {
+    localStories[idx] = newStory;
+  } else {
+    localStories.unshift(newStory);
+  }
+  saveLocalStories(localStories);
+  return newStory;
+}
+
+export function subscribeToStories(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const storiesCol = collection(db, 'pairs', cleanCode, 'stories');
+    return onSnapshot(storiesCol, (snapshot) => {
+      const stories = [];
+      snapshot.forEach((docSnap) => {
+        stories.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      stories.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(stories);
+    });
+  }
+
+  // Fallback local polling subscription
+  const pollInterval = setInterval(() => {
+    const list = getLocalStories().filter(s => (s.pairId || cleanCode).toUpperCase() === cleanCode);
+    list.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+    callback(list);
+  }, 1000);
+
+  const initialList = getLocalStories().filter(s => (s.pairId || cleanCode).toUpperCase() === cleanCode);
+  initialList.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+  callback(initialList);
+
+  return () => clearInterval(pollInterval);
+}
+
+export async function reactToStory(pairCode, storyId, user, emoji) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const storyRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
+    const snap = await getDoc(storyRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentReactions = data.reactions || {};
+      const emojiData = currentReactions[emoji] || { count: 0, users: [] };
+      
+      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!newUsers.includes(userId)) {
+        newUsers.push(userId);
+      }
+      
+      const updatedReactions = {
+        ...currentReactions,
+        [emoji]: {
+          count: (emojiData.count || 0) + 1,
+          users: newUsers,
+          lastReactedBy: userName,
+          lastReactedAt: timestamp
+        }
+      };
+
+      await updateDoc(storyRef, { reactions: updatedReactions });
+      return updatedReactions;
+    }
+  }
+
+  // Local storage fallback
+  const localStories = getLocalStories();
+  const story = localStories.find(s => s.id === storyId);
+  if (story) {
+    story.reactions = story.reactions || {};
+    const emojiData = story.reactions[emoji] || { count: 0, users: [] };
+    const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+    if (!newUsers.includes(userId)) newUsers.push(userId);
+    story.reactions[emoji] = {
+      count: (emojiData.count || 0) + 1,
+      users: newUsers,
+      lastReactedBy: userName,
+      lastReactedAt: timestamp
+    };
+    saveLocalStories(localStories);
+    return story.reactions;
+  }
+  return null;
+}
+
+export async function markStoryAsViewed(pairCode, storyId, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const storyRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
+    const snap = await getDoc(storyRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentViewedBy = Array.isArray(data.viewedBy) ? data.viewedBy : [];
+      if (!currentViewedBy.includes(userId)) {
+        const updatedViewedBy = [...currentViewedBy, userId];
+        await updateDoc(storyRef, {
+          viewedBy: updatedViewedBy,
+          [`seenAt_${userId}`]: timestamp,
+          lastSeenByName: userName
+        });
+      }
+    }
+    return;
+  }
+
+  // Local storage fallback
+  const localStories = getLocalStories();
+  const story = localStories.find(s => s.id === storyId);
+  if (story) {
+    story.viewedBy = Array.isArray(story.viewedBy) ? story.viewedBy : [];
+    if (!story.viewedBy.includes(userId)) {
+      story.viewedBy.push(userId);
+      story[`seenAt_${userId}`] = timestamp;
+      story.lastSeenByName = userName;
+      saveLocalStories(localStories);
+    }
+  }
+}
+
+export async function deleteStoryFromCloud(pairCode, storyId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    await deleteDoc(doc(db, 'pairs', cleanCode, 'stories', storyId));
+  }
+  const localStories = getLocalStories().filter(s => s.id !== storyId);
+  saveLocalStories(localStories);
+}
+
 
 
