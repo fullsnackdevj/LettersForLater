@@ -33,6 +33,13 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const [hasOpenedPlaylist, setHasOpenedPlaylist] = useState(() => {
+    try {
+      return localStorage.getItem('lettersforlater_music_playlist_opened') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const currentTrack = playlist[currentTrackIndex] || playlist[0] || {
     id: 'default',
@@ -257,7 +264,16 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
           {/* Playlist Popover Trigger */}
           <div className="relative">
             <button
-              onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
+              onClick={() => {
+                const next = !isPlaylistOpen;
+                setIsPlaylistOpen(next);
+                if (!hasOpenedPlaylist) {
+                  setHasOpenedPlaylist(true);
+                  try {
+                    localStorage.setItem('lettersforlater_music_playlist_opened', 'true');
+                  } catch {}
+                }
+              }}
               className={`relative p-1.5 sm:p-2 rounded-lg border transition-all active:scale-95 flex items-center justify-center cursor-pointer ${
                 isPlaylistOpen
                   ? 'bg-[#D4AF37] text-[#3D2600] border-[#D4AF37]'
@@ -267,7 +283,7 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
               aria-label="View playlist"
             >
               <ListMusic className="w-3.5 h-3.5" />
-              {playlist.length > 1 && (
+              {playlist.length > 1 && !hasOpenedPlaylist && (
                 <span className="absolute -top-1.5 -right-1.5 bg-[#D4AF37] text-[#3D2600] text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
                   {playlist.length}
                 </span>
