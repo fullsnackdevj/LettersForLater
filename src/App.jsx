@@ -336,6 +336,7 @@ export default function App() {
               setIsDetailOpen(true);
             }}
             onOpenPairing={() => setIsPairingOpen(true)}
+            onOpenInfo={() => setIsInfoOpen(true)}
           />
         ) : (
           <TimelineView

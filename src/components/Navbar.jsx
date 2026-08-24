@@ -7,7 +7,9 @@ import {
   Sparkles, 
   HelpCircle,
   BookOpen,
-  Plus
+  Plus,
+  Menu,
+  X
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -245,16 +247,6 @@ export default function Navbar({
         {/* User & Pair Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           
-          {/* How It Works Info Button */}
-          <button
-            onClick={onOpenInfo}
-            className="flex items-center gap-1 bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] text-[#A83232] px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-            title="How this works in the future"
-          >
-            <HelpCircle className="w-4 h-4 text-[#A83232]" />
-            <span className="hidden xl:inline">Info</span>
-          </button>
-          
           {/* Wedding Hashtag / Sealed Status Pill */}
           <button
             onClick={isLettersUnlocked ? onOpenPairing : undefined}
@@ -283,61 +275,90 @@ export default function Navbar({
             )}
           </button>
 
-          {/* Auth Button / Profile Avatar */}
+          {/* Auth Button / Mobile Hamburger Menu */}
           {user ? (
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-2 p-1 rounded-full border-2 border-[#D4AF37] hover:scale-105 transition-transform bg-[#FDFBF7]"
+                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center border transition-all shadow-xs cursor-pointer touch-manipulation active:scale-95 ${
+                  isProfileOpen
+                    ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]/60 shadow-md'
+                    : 'bg-[#FAF5EC] hover:bg-[#EFE9DE] border-[#D2C3B0] text-[#36271C] hover:scale-105'
+                }`}
+                title="Open Menu"
+                aria-label="Toggle navigation menu"
               >
-                <img
-                  src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                  alt={user.displayName}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
-                />
+                {isProfileOpen ? (
+                  <X className="w-4 h-4 text-[#F8E3B6]" />
+                ) : (
+                  <Menu className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#36271C]" />
+                )}
               </button>
 
               {/* Profile Dropdown Drawer */}
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#FDFBF7] border border-[#E2D7C7] rounded-xl shadow-xl p-4 text-xs z-50 animate-fadeIn">
-                  <div className="flex items-center gap-3 pb-3 border-b border-[#EFE9DE]">
-                    <img
-                      src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                      alt={user.displayName}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                    <div>
-                      <p className="font-bold text-sm text-[#36271C]">{getNickname(user.displayName)}</p>
-                      <p className="text-[#9E8B75] truncate">{user.email}</p>
-                    </div>
-                  </div>
+                <>
+                  {/* Backdrop Dismiss */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsProfileOpen(false)}
+                  />
 
-                  <div className="py-3 space-y-2 border-b border-[#EFE9DE]">
-                    <div className="flex items-center justify-between text-[#4A3B2C]">
-                      <span>Pair Status:</span>
-                      <span className="font-mono font-bold text-[#A83232]">{pairInfo?.code}</span>
+                  <div className="absolute right-0 mt-2 w-64 bg-[#FDFBF7] border border-[#E2D7C7] rounded-2xl shadow-2xl p-4 text-xs z-50 animate-fadeIn">
+                    <div className="flex items-center gap-3 pb-3 border-b border-[#EFE9DE]">
+                      <img
+                        src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                        alt={user.displayName}
+                        className="w-10 h-10 rounded-full object-cover border border-[#D4AF37]"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-[#36271C] truncate">{getNickname(user.displayName)}</p>
+                        <p className="text-[#9E8B75] truncate text-[11px]">{user.email}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-[#4A3B2C]">
-                      <span>Timezone:</span>
-                      <span className="font-mono text-[10px] bg-[#EFE9DE] px-1.5 py-0.5 rounded">PHT (GMT+8)</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#4A3B2C]">
-                      <span>Logged Stories:</span>
-                      <span className="font-mono text-[11px] font-bold text-[#A83232]">{stories.length}</span>
-                    </div>
-                  </div>
 
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      onSignOut();
-                    }}
-                    className="w-full mt-2 flex items-center justify-center gap-2 py-1.5 px-3 bg-[#FAF5EC] hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg transition-colors font-medium"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign Out
-                  </button>
-                </div>
+                    <div className="py-3 space-y-2 border-b border-[#EFE9DE]">
+                      <div className="flex items-center justify-between text-[#4A3B2C]">
+                        <span>Pair Status:</span>
+                        <span className="font-mono font-bold text-[#A83232]">{pairInfo?.code}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[#4A3B2C]">
+                        <span>Timezone:</span>
+                        <span className="font-mono text-[10px] bg-[#EFE9DE] px-1.5 py-0.5 rounded">PHT (GMT+8)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[#4A3B2C]">
+                        <span>Logged Stories:</span>
+                        <span className="font-mono text-[11px] font-bold text-[#A83232]">{stories.length}</span>
+                      </div>
+                    </div>
+
+                    {/* How It Works & App Guide in Profile */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        onOpenInfo();
+                      }}
+                      className="w-full mt-2.5 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-[#A83232]" />
+                      <span>How It Works & Info</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        onSignOut();
+                      }}
+                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Sign Out
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           ) : (

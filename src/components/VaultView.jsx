@@ -16,7 +16,8 @@ import {
   Inbox,
   ArrowUpDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  HelpCircle
 } from 'lucide-react';
 import LetterCard from './LetterCard';
 import MissYouWidget from './MissYouWidget';
@@ -30,7 +31,8 @@ export default function VaultView({
   onWriteNew, 
   onEditLetter, 
   onViewLetter, 
-  onOpenPairing 
+  onOpenPairing,
+  onOpenInfo
 }) {
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'important' | 'drafts'
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
@@ -81,6 +83,19 @@ export default function VaultView({
         <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none select-none">
           <Mail className="w-32 h-32 sm:w-48 sm:h-48 text-[#F3E5AB]" />
         </div>
+
+        {/* Info / How It Works Icon Button (Positioned at top right of banner) */}
+        {onOpenInfo && (
+          <button
+            type="button"
+            onClick={onOpenInfo}
+            className="absolute top-3.5 right-3.5 sm:top-5 sm:right-6 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-[#FAF5EC]/15 hover:bg-[#FAF5EC]/25 text-[#F8E3B6] hover:text-white border border-[#D4AF37]/60 transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md"
+            title="How LettersForLater Works"
+            aria-label="How LettersForLater Works"
+          >
+            <HelpCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-[#F8E3B6]" />
+          </button>
+        )}
 
         <div className="relative z-10 max-w-3xl space-y-2">
           {/* Time-based Greeting */}
