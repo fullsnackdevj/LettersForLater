@@ -641,13 +641,6 @@ export default function StoryCreatorModal({
                 </div>
               )}
 
-              {/* Selected Pure Emoji Stamp Overlay */}
-              {selectedEmoji && (
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-2xl p-2 rounded-2xl border border-white/20 shadow-lg animate-bounce pointer-events-none z-10">
-                  {selectedEmoji}
-                </div>
-              )}
-
               {/* Author Avatar Badge */}
               <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 border border-white/20 pointer-events-none z-10">
                 <span>{authorNickname}</span>

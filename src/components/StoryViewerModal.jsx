@@ -599,13 +599,6 @@ export default function StoryViewerModal({
               
               {/* Optional Polaroid tape effect on top */}
               <div className="tape-strip top-4 opacity-75 pointer-events-none" />
-
-              {/* Floating Emoji Mood Stamp in Corner */}
-              {currentStory.moodTag && (
-                <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-2xl p-2 rounded-2xl border border-white/20 shadow-lg pointer-events-none">
-                  {currentStory.moodTag}
-                </div>
-              )}
             </div>
           ) : (
             <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center text-white/70 space-y-2">

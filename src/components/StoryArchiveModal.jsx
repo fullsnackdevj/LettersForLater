@@ -163,13 +163,6 @@ export default function StoryArchiveModal({
                         </div>
                       )}
 
-                      {/* Emoji Mood Stamp */}
-                      {story.moodTag && (
-                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-base p-1.5 rounded-xl border border-white/20 shadow-md">
-                          {story.moodTag}
-                        </div>
-                      )}
-
                       {/* Active 24h Badge */}
                       {isStillActive && (
                         <div className="absolute top-2 right-2 bg-[#A83232]/95 text-[#F8E3B6] text-[9px] font-bold px-2 py-0.5 rounded-full border border-[#D4AF37]/50 shadow-sm backdrop-blur-xs flex items-center gap-1">
