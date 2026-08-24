@@ -455,6 +455,12 @@ export default function App() {
         onDeleteStory={handleDeleteStory}
         onOpenAsLetter={handleOpenStoryAsLetter}
         onMarkAsViewed={handleMarkStoryAsViewed}
+        onOpenStoryCreator={() => {
+          setIsStoryViewerOpen(false);
+          handleWithIntroCheck(() => {
+            setIsStoryCreatorOpen(true);
+          });
+        }}
       />
 
       {/* Story Archive / Memory Log Modal */}

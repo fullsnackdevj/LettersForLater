@@ -10,12 +10,15 @@ import {
   Check, 
   Eye, 
   AlertTriangle,
-  Mail
+  Mail,
+  Plus,
+  MoreHorizontal
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { downloadImage } from '../utils/fileDownloader';
 
 const REACTION_EMOJIS = ['❤️', '🥺', '😂', '😚', '✨', '☕', '🫶'];
+const STORY_DURATION_MS = 15000; // 15 seconds per story slide
 
 export default function StoryViewerModal({
   isOpen,
@@ -27,9 +30,14 @@ export default function StoryViewerModal({
   onReact,
   onDeleteStory,
   onOpenAsLetter,
-  onMarkAsViewed
+  onMarkAsViewed,
+  onOpenStoryCreator
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialStoryIndex);
+  const [progress, setProgress] = useState(0); // 0 to 100%
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const [floatingParticles, setFloatingParticles] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -43,11 +51,16 @@ export default function StoryViewerModal({
 
   const touchStartXRef = useRef(0);
   const touchEndXRef = useRef(0);
+  const pressTimerRef = useRef(null);
+  const isHoldingRef = useRef(false);
 
   // Sync initial story index when opened
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(Math.min(Math.max(initialStoryIndex, 0), Math.max(0, stories.length - 1)));
+      setProgress(0);
+      setIsMenuOpen(false);
+      setIsPaused(false);
       setDownloadSuccess(false);
       setShowDeleteConfirm(false);
       setShowVaultConfirm(false);
@@ -78,6 +91,8 @@ export default function StoryViewerModal({
 
   // Move to next story or close if at end
   const handleNext = useCallback(() => {
+    setProgress(0);
+    setIsMenuOpen(false);
     if (currentIndex < stories.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setDownloadSuccess(false);
@@ -88,10 +103,40 @@ export default function StoryViewerModal({
 
   // Move to previous story
   const handlePrev = useCallback(() => {
+    setProgress(0);
+    setIsMenuOpen(false);
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       setDownloadSuccess(false);
     }
+  }, [currentIndex]);
+
+  // 15-second progress ticker for active story slide
+  useEffect(() => {
+    if (!isOpen || showDeleteConfirm || showVaultConfirm || isMenuOpen || isPaused || !currentStory) {
+      return;
+    }
+
+    const intervalMs = 50;
+    const increment = (intervalMs / STORY_DURATION_MS) * 100;
+
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          handleNext();
+          return 0;
+        }
+        return prev + increment;
+      });
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [isOpen, showDeleteConfirm, showVaultConfirm, isMenuOpen, isPaused, currentStory, handleNext]);
+
+  // Reset progress when index changes
+  useEffect(() => {
+    setProgress(0);
+    setIsMenuOpen(false);
   }, [currentIndex]);
 
   // Keyboard navigation & escape listener
@@ -104,28 +149,58 @@ export default function StoryViewerModal({
       } else if (e.key === 'ArrowLeft') {
         handlePrev();
       } else if (e.key === 'Escape') {
-        onClose();
+        if (isMenuOpen) {
+          setIsMenuOpen(false);
+        } else {
+          onClose();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, showDeleteConfirm, showVaultConfirm, handleNext, handlePrev, onClose]);
+  }, [isOpen, showDeleteConfirm, showVaultConfirm, isMenuOpen, handleNext, handlePrev, onClose]);
+
+  // Pointer hold handlers to pause 15s timer (like Instagram hold-to-pause)
+  const handlePointerDown = () => {
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
+    isHoldingRef.current = false;
+    pressTimerRef.current = setTimeout(() => {
+      isHoldingRef.current = true;
+      setIsPaused(true);
+    }, 180);
+  };
+
+  const handlePointerUp = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+    }
+    if (isHoldingRef.current) {
+      setIsPaused(false);
+      setTimeout(() => {
+        isHoldingRef.current = false;
+      }, 50);
+      return;
+    }
+    setIsPaused(false);
+  };
 
   // Handle Touch Swipes for mobile
   const handleTouchStart = (e) => {
-    if (showDeleteConfirm || showVaultConfirm) return;
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
     touchStartXRef.current = e.touches[0].clientX;
     touchEndXRef.current = e.touches[0].clientX;
+    handlePointerDown();
   };
 
   const handleTouchMove = (e) => {
-    if (showDeleteConfirm || showVaultConfirm) return;
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
     touchEndXRef.current = e.touches[0].clientX;
   };
 
   const handleTouchEnd = () => {
-    if (showDeleteConfirm || showVaultConfirm) return;
+    handlePointerUp();
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
     const diff = touchStartXRef.current - touchEndXRef.current;
     if (diff > 45) {
       handleNext();
@@ -136,7 +211,7 @@ export default function StoryViewerModal({
 
   // Handle tap on left/right edges of screen
   const handleClickNavigate = (e) => {
-    if (showDeleteConfirm || showVaultConfirm) return;
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen || isHoldingRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     if (x < rect.width * 0.35) {
@@ -226,16 +301,17 @@ export default function StoryViewerModal({
 
   if (!isOpen || !currentStory) return null;
 
-  // Relative Time helper
+  // Relative Time helper (Instagram compact format)
   const getTimeAgo = (isoString) => {
-    if (!isoString) return 'Today';
+    if (!isoString) return 'Just now';
     const diffMs = Date.now() - new Date(isoString).getTime();
     const mins = Math.floor(diffMs / 60000);
     if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 60) return `${mins}m`;
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return '1d ago';
+    if (hrs < 24) return `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d`;
   };
 
   // Full Exact Date & Time Helper
@@ -319,129 +395,182 @@ export default function StoryViewerModal({
       <div className="relative w-full max-w-[420px] h-full max-h-[100vh] sm:max-h-[88vh] sm:rounded-3xl overflow-hidden shadow-2xl bg-[#1C1D24] border sm:border-2 sm:border-[#D4AF37]/40 flex flex-col justify-between">
         
         {/* ─────────────────────────────────────────────────────────────
-            TOP HEADER: Segmented Nodes & Author Profile
+            TOP HEADER: Segmented Progress (15s) & Clean Profile Bar
            ───────────────────────────────────────────────────────────── */}
-        <div className="relative z-30 p-3 sm:p-4 bg-gradient-to-b from-black/85 via-black/50 to-transparent space-y-2">
+        <div className="relative z-30 p-3 sm:p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent space-y-2.5">
           
-          {/* Segmented Progress Nodes */}
+          {/* Segmented Progress Nodes (15s smooth auto-fill) */}
           <div className="flex items-center gap-1.5 w-full">
-            {stories.map((s, idx) => (
-              <div 
-                key={s.id || idx}
-                onClick={() => !showDeleteConfirm && !showVaultConfirm && setCurrentIndex(idx)}
-                className="flex-1 h-1.5 bg-white/25 rounded-full overflow-hidden cursor-pointer"
-              >
+            {stories.map((s, idx) => {
+              let width = '0%';
+              if (idx < currentIndex) width = '100%';
+              else if (idx === currentIndex) width = `${Math.min(progress, 100)}%`;
+
+              return (
                 <div 
-                  className={`h-full bg-white rounded-full transition-all duration-300 ${
-                    idx <= currentIndex ? 'w-full opacity-100' : 'w-0 opacity-0'
-                  }`}
-                />
-              </div>
-            ))}
+                  key={s.id || idx}
+                  onClick={() => {
+                    if (!showDeleteConfirm && !showVaultConfirm) {
+                      setProgress(0);
+                      setCurrentIndex(idx);
+                    }
+                  }}
+                  className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer"
+                >
+                  <div 
+                    className="h-full bg-white rounded-full transition-all ease-linear"
+                    style={{ 
+                      width,
+                      transitionDuration: idx === currentIndex ? '50ms' : '200ms'
+                    }}
+                  />
+                </div>
+              );
+            })}
           </div>
 
-          {/* Author Badge, Time, Seen Indicator & Controls */}
-          <div className="flex items-center justify-between text-white pt-1">
-            <div className="flex items-center gap-2.5">
+          {/* Author Badge, Time & Controls (Single Clean Line) */}
+          <div className="flex items-center justify-between text-white pt-0.5">
+            <div 
+              className="flex items-center gap-2 min-w-0 pr-2"
+              title={formatStoryDateTime(currentStory)}
+            >
               {/* Avatar */}
-              <div className="relative p-0.5 rounded-full bg-gradient-to-tr from-[#D4AF37] to-[#A83232]">
-                <img
-                  src={currentStory.authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                  alt={currentStory.authorName}
-                  className="w-8 h-8 rounded-full object-cover border border-white"
-                />
-              </div>
+              <img
+                src={currentStory.authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                alt={currentStory.authorName}
+                className="w-8 h-8 rounded-full object-cover border border-white/80 shrink-0 shadow-sm"
+              />
 
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="font-bold text-xs sm:text-sm drop-shadow">
-                    {getNickname(currentStory.authorName)}
-                  </p>
-                  {currentStory.moodTag && (
-                    <span className="text-base drop-shadow animate-pulse" title="Mood Stamp">
-                      {currentStory.moodTag}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-white/80">
-                  <span className="bg-white/15 text-[#F8E3B6] px-1.5 py-0.2 rounded font-mono text-[9px] font-bold">
-                    {getTimeAgo(currentStory.createdAtIso)}
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
+                <span className="font-bold text-xs sm:text-sm text-white drop-shadow truncate">
+                  {getNickname(currentStory.authorName)}
+                </span>
+                
+                {currentStory.moodTag && (
+                  <span className="text-sm shrink-0" title="Mood Stamp">
+                    {currentStory.moodTag}
                   </span>
-                  <span className="font-mono text-white/90">
-                    {formatStoryDateTime(currentStory)}
-                  </span>
-                </div>
+                )}
+
+                <span className="text-white/40 text-xs shrink-0">•</span>
+
+                <span className="text-xs text-white/75 shrink-0 font-medium">
+                  {getTimeAgo(currentStory.createdAtIso)}
+                </span>
               </div>
             </div>
 
-            {/* Top Right Action Menu (Clean: Download, Delete, Close) */}
-            <div className="flex items-center gap-1.5">
+            {/* Top Right Action Menu: Three Horizontal Dots [...] & Close [X] */}
+            <div className="relative flex items-center gap-1.5 shrink-0">
               
-              {/* Download photo button */}
-              {currentStory.mediaUrl && (
-                <button
-                  onClick={handleDownloadStoryMedia}
-                  disabled={isDownloading}
-                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center transition-colors shadow-xs"
-                  title="Download photo to your device"
-                >
-                  {isDownloading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : downloadSuccess ? (
-                    <Check className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                </button>
-              )}
-
-              {/* Delete button (Only for story author) */}
-              {isAuthor && onDeleteStory && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(true);
-                  }}
-                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-rose-900/80 text-white flex items-center justify-center transition-colors shadow-xs"
-                  title="Delete Story"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-300" />
-                </button>
-              )}
+              {/* Three Horizontal Dots Menu Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMenuOpen(prev => !prev);
+                }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs cursor-pointer touch-manipulation ${
+                  isMenuOpen 
+                    ? 'bg-[#A83232] text-[#F8E3B6] scale-105' 
+                    : 'bg-black/40 hover:bg-black/70 text-white active:scale-95'
+                }`}
+                title="Story Options"
+                aria-label="Story options"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
 
               {/* Close Button */}
               <button
+                type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors shadow-xs"
+                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
+                title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
+
+              {/* Three Dots Dropdown Menu Popover */}
+              {isMenuOpen && (
+                <>
+                  {/* Backdrop dismiss */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMenuOpen(false);
+                    }} 
+                  />
+
+                  <div 
+                    className="absolute right-0 top-10 w-44 bg-[#261B14]/95 backdrop-blur-xl border border-[#D4AF37]/50 rounded-2xl shadow-2xl p-1.5 z-50 animate-fadeIn space-y-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Add New Story */}
+                    {onOpenStoryCreator && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onOpenStoryCreator();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[#F8E3B6] hover:bg-white/10 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-[#A83232] flex items-center justify-center text-[#F8E3B6] shrink-0">
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </div>
+                        <span>Add New Story</span>
+                      </button>
+                    )}
+
+                    {/* Download Photo */}
+                    {currentStory.mediaUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          setIsMenuOpen(false);
+                          handleDownloadStoryMedia(e);
+                        }}
+                        disabled={isDownloading}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-white shrink-0">
+                          {isDownloading ? (
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : downloadSuccess ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+                        <span>{downloadSuccess ? 'Downloaded!' : 'Save Photo'}</span>
+                      </button>
+                    )}
+
+                    {/* Delete Story (Only if Author) */}
+                    {isAuthor && onDeleteStory && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          setShowDeleteConfirm(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-950/40 rounded-xl transition-colors text-left border-t border-white/10 pt-1.5 cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-rose-900/50 flex items-center justify-center text-rose-300 shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </div>
+                        <span>Delete Story</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
             </div>
 
-          </div>
-
-          {/* Seen Status Badge Header Indicator */}
-          <div className="flex items-center justify-between text-[10px] pt-0.5">
-            {isViewedByBoth ? (
-              <span className="flex items-center gap-1 bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-medium shadow-xs">
-                <Eye className="w-3 h-3 text-emerald-400" />
-                <span>Seen by both of you 👀💕</span>
-              </span>
-            ) : isViewedByPartner ? (
-              <span className="flex items-center gap-1 bg-amber-950/70 text-amber-200 border border-amber-500/40 px-2 py-0.5 rounded-full font-medium shadow-xs">
-                <Eye className="w-3 h-3 text-amber-400" />
-                <span>Seen by {partnerName}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 bg-white/10 text-white/80 border border-white/15 px-2 py-0.5 rounded-full font-medium">
-                <Eye className="w-3 h-3 text-white/60" />
-                <span>Seen by you • Not seen by {partnerName} yet</span>
-              </span>
-            )}
-
-            <span className="text-[10px] text-white/60 font-mono">
-              Slide {currentIndex + 1} of {stories.length}
-            </span>
           </div>
 
         </div>
@@ -452,6 +581,9 @@ export default function StoryViewerModal({
         <div 
           className="relative flex-1 flex items-center justify-center overflow-hidden cursor-pointer bg-black"
           onClick={handleClickNavigate}
+          onMouseDown={handlePointerDown}
+          onMouseUp={handlePointerUp}
+          onMouseLeave={handlePointerUp}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -614,25 +746,29 @@ export default function StoryViewerModal({
                 })}
               </div>
             ) : (
-              /* OWN STORY: Show Received Reactions summary instead of reacting to self */
-              <div className="flex items-center gap-1.5 text-xs text-white/80 py-1">
-                {receivedReactions.length > 0 ? (
-                  <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-white/10">
-                    <span className="text-[11px] text-[#F8E3B6] font-medium">Reactions:</span>
-                    <div className="flex items-center gap-1">
-                      {receivedReactions.map(([emoji, r]) => (
-                        <span key={emoji} className="inline-flex items-center gap-0.5 text-xs bg-white/10 px-1.5 py-0.5 rounded-md">
-                          <span>{emoji}</span>
-                          <span className="text-[10px] font-bold font-mono text-white">{r.count}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-[11px] text-white/50 italic pl-1">
-                    Your published story • Waiting for {partnerName}'s reaction
+              /* OWN STORY: Show Seen Status & Received Reactions cleanly in footer */
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-white/90 py-0.5">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs ${
+                  isViewedByBoth || isViewedByPartner
+                    ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
+                    : 'bg-black/40 border-white/10 text-white/70'
+                }`}>
+                  <Eye className="w-3 h-3 text-[#D4AF37]" />
+                  <span>
+                    {isViewedByBoth
+                      ? `Seen by ${partnerName} 👀💕`
+                      : isViewedByPartner
+                        ? `Seen by ${partnerName}`
+                        : 'Seen only by you'}
                   </span>
-                )}
+                </span>
+
+                {receivedReactions.map(([emoji, r]) => (
+                  <span key={emoji} className="inline-flex items-center gap-1 text-xs bg-black/40 border border-white/10 px-2 py-0.5 rounded-full">
+                    <span>{emoji}</span>
+                    <span className="text-[10px] font-bold font-mono text-white">{r.count}</span>
+                  </span>
+                ))}
               </div>
             )}
 
