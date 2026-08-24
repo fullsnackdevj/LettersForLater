@@ -183,6 +183,16 @@ export default function App() {
 
   const handleMarkStoryAsViewed = async (storyId) => {
     if (!storyId || !user) return;
+    const userId = user.uid || 'demo-user-1';
+    setStories(prev => prev.map(s => {
+      if (s.id === storyId) {
+        const viewers = Array.isArray(s.viewedBy) ? s.viewedBy : [];
+        if (!viewers.includes(userId)) {
+          return { ...s, viewedBy: [...viewers, userId] };
+        }
+      }
+      return s;
+    }));
     await markStoryAsViewed(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user);
   };
 

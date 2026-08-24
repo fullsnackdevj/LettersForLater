@@ -96,14 +96,6 @@ export default function Navbar({
 
             {/* Jay / Current User Story Avatar Ring */}
             <div className="relative group shrink-0">
-              {/* Attention Glow Badge for first-time / new feature indicator */}
-              {!hasSeenStoriesIntro && (
-                <span className="absolute -top-1.5 -left-1.5 flex h-3.5 w-3.5 pointer-events-none z-20">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-90"></span>
-                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-[#A83232] border-2 border-white shadow-sm"></span>
-                </span>
-              )}
-
               <button
                 type="button"
                 onClick={() => {
@@ -114,20 +106,18 @@ export default function Navbar({
                   }
                 }}
                 className={`relative p-0.5 rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
-                  !hasSeenStoriesIntro
-                    ? 'first-time-feature-glow ring-4 ring-[#D4AF37] ring-offset-2 ring-offset-[#FAF5EC] p-[2px]'
-                    : myActiveStories.length > 0 
-                      ? myHasUnseen
-                        ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                        : 'border-2 border-[#D4AF37] ring-1 ring-[#D4AF37]/30 p-[1px]'
-                      : 'border-2 border-dashed border-[#D4AF37]/70 p-[1px]'
+                  myActiveStories.length > 0 
+                    ? myHasUnseen
+                      ? 'story-ring-glow animate-story-pulse p-[2px]' 
+                      : 'border-2 border-[#D2C3B0] p-[1px]'
+                    : 'border-2 border-dashed border-[#D4AF37]/70 p-[1px]'
                 }`}
                 title={
-                  !hasSeenStoriesIntro
-                    ? '✨ Tap to discover Our Daily Stories!'
-                    : myActiveStories.length > 0 
-                      ? `View your stories (${myActiveStories.length} active) • Tap '+' to add another`
-                      : `Post a story for today`
+                  myActiveStories.length > 0 
+                    ? myHasUnseen
+                      ? `✨ You have new unviewed stories (${myActiveStories.length})`
+                      : `Your stories (${myActiveStories.length} active) • Tap '+' to add another`
+                    : `Post a story for today`
                 }
               >
                 <img
@@ -148,9 +138,7 @@ export default function Navbar({
                 onTouchEnd={(e) => {
                   e.stopPropagation();
                 }}
-                className={`absolute -bottom-1 -right-1 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] rounded-full w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center border-2 border-white shadow-md transition-all cursor-pointer z-30 touch-manipulation hover:scale-115 active:scale-90 before:content-[''] before:absolute before:-inset-2.5 before:rounded-full ${
-                  !hasSeenStoriesIntro ? 'animate-bounce shadow-lg scale-110 ring-2 ring-[#D4AF37]' : ''
-                }`}
+                className="absolute -bottom-1 -right-1 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] rounded-full w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center border-2 border-white shadow-md transition-all cursor-pointer z-30 touch-manipulation hover:scale-115 active:scale-90 before:content-[''] before:absolute before:-inset-2.5 before:rounded-full"
                 title="Add a new story"
                 aria-label="Add story"
               >
@@ -177,7 +165,7 @@ export default function Navbar({
                   partnerActiveStories.length > 0 
                     ? partnerHasUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D4AF37] ring-1 ring-[#D4AF37]/30 p-[1px]'
+                      : 'border-2 border-[#D2C3B0] p-[1px]'
                     : 'border-2 border-dashed border-[#D2C3B0] opacity-85 p-[1px]'
                 }`}
                 title={
