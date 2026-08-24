@@ -271,4 +271,25 @@
   background: linear-gradient(135deg, #E9ECE7 0%, #C7D3C0 50%, #6E886D 100%);
 }
 
+/* Background Music Player Marquee */
+@keyframes musicMarquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-music-marquee {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: musicMarquee 14s linear infinite;
+}
+
+.animate-music-marquee:hover {
+  animation-play-state: paused;
+}
+
+
 

@@ -247,7 +247,7 @@ export default function App() {
       
       {/* Very Top Background Music Player — Only active AFTER successful login & app unlock */}
       {user && isAppUnlocked && !isAuthOpen && (
-        <MusicPlayer audioSrc="/Tugon (The Wedding Version).mp3" songTitle="Tugon (The Wedding Version)" />
+        <MusicPlayer />
       )}
 
       {/* Top Navbar with integrated Our Stories */}
