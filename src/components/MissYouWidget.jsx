@@ -4,7 +4,7 @@ import { recordMissYou, subscribeToDailyMisses } from '../services/firebase';
 import { getTodayPHTKey } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
 
-const SPAM_THRESHOLD = 5;        // consecutive rapid taps to trigger cooldown
+const SPAM_THRESHOLD = 11;       // consecutive rapid taps to trigger cooldown (allows exactly 10 taps)
 const SPAM_WINDOW_MS = 2000;     // max ms between taps to count as consecutive
 const COOLDOWN_SECONDS = 60;     // cooldown duration in seconds
 
