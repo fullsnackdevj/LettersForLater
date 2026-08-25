@@ -9,7 +9,8 @@ import {
   BookOpen,
   Plus,
   Menu,
-  X
+  X,
+  Eye
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -70,6 +71,11 @@ export default function Navbar({
   const myHasUnseen = myActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
   const partnerHasUnseen = partnerActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
 
+  // Check if my stories have been seen by partner
+  const mySeenByPartner = myActiveStories.length > 0 && myActiveStories.some(s => 
+    (s.viewedBy || []).some(id => id !== currentUserId)
+  );
+
   return (
     <header className="sticky top-0 z-40 bg-[#F6F2EB]/95 backdrop-blur-md border-b border-[#E2D7C7] px-3 sm:px-4 lg:px-8 py-2 sm:py-2.5 transition-all shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
@@ -116,14 +122,16 @@ export default function Navbar({
                   myActiveStories.length > 0 
                     ? myHasUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D2C3B0] p-[1px]'
+                      : 'border-2 border-[#D4AF37] p-[1px]'
                     : 'border-2 border-dashed border-[#D4AF37]/70 p-[1px]'
                 }`}
                 title={
                   myActiveStories.length > 0 
                     ? myHasUnseen
                       ? `✨ You have new unviewed stories (${myActiveStories.length})`
-                      : `Your stories (${myActiveStories.length} active) • Tap '+' to add another`
+                      : mySeenByPartner
+                        ? `Your stories (${myActiveStories.length}) • Seen by ${partnerName} 💕`
+                        : `Your stories (${myActiveStories.length} active) • Tap '+' to add another`
                     : `Post a story for today`
                 }
               >
@@ -133,6 +141,16 @@ export default function Navbar({
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white"
                 />
               </button>
+
+              {/* Partner Seen Green Eye Badge for Your Story */}
+              {mySeenByPartner && !myHasUnseen && (
+                <span 
+                  className="absolute -top-1 -right-1 bg-emerald-700 text-white rounded-full p-0.5 border border-white shadow-xs z-30 pointer-events-none" 
+                  title={`Seen by ${partnerName} 💕`}
+                >
+                  <Eye className="w-2.5 h-2.5" />
+                </span>
+              )}
 
               {/* Dedicated Large Touch-Target Plus Button */}
               <button
@@ -171,7 +189,7 @@ export default function Navbar({
                   partnerActiveStories.length > 0 
                     ? partnerHasUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D2C3B0] p-[1px]'
+                      : 'border-2 border-[#D4AF37] p-[1px]'
                     : 'border-2 border-dashed border-[#D2C3B0] opacity-85 p-[1px]'
                 }`}
                 title={
