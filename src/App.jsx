@@ -38,6 +38,7 @@ import {
   updateUserStatus,
   subscribeToStatuses,
   reactToStatus,
+  sendCheerToStatus,
   markStatusAsViewed
 } from './services/firebase';
 
@@ -362,6 +363,43 @@ export default function App() {
     });
 
     await reactToStatus(pairCode, targetUserId, user, emoji);
+  }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
+
+  const handleSendCheerToStatus = useCallback(async (targetUserId, cheerText) => {
+    if (!targetUserId || !user || !cheerText) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user.uid || 'demo-user-1';
+    const currentUserName = user.displayName || 'Partner';
+    const timestamp = new Date().toISOString();
+
+    const cheerObj = {
+      text: cheerText,
+      fromName: currentUserName,
+      fromId: currentUserId,
+      atIso: timestamp
+    };
+
+    setStatuses(prev => {
+      const target = prev[targetUserId];
+      if (!target) return prev;
+      const currentCheers = Array.isArray(target.cheers) ? target.cheers : [];
+      const updatedDoc = {
+        ...target,
+        lastCheer: cheerObj,
+        cheers: [cheerObj, ...currentCheers.slice(0, 19)]
+      };
+
+      if (selectedStatusForDetail?.userId === targetUserId) {
+        setSelectedStatusForDetail(updatedDoc);
+      }
+
+      return {
+        ...prev,
+        [targetUserId]: updatedDoc
+      };
+    });
+
+    await sendCheerToStatus(pairCode, targetUserId, user, cheerText);
   }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
 
   const handleMarkStatusAsViewed = useCallback(async (targetUserId) => {
@@ -714,6 +752,7 @@ export default function App() {
         currentUser={user}
         pairInfo={pairInfo}
         onReactToStatus={handleReactToStatus}
+        onSendCheer={handleSendCheerToStatus}
         onMarkStatusAsViewed={handleMarkStatusAsViewed}
         onOpenStatusPicker={() => {
           setIsStatusDetailOpen(false);

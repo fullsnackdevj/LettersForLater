@@ -107,11 +107,18 @@ export default function CoupleStatusBanner({
               {partnerStatus?.statusText || `${partnerName} hasn't posted yet`}
             </p>
 
-            {partnerStatus?.customNote && (
+            {partnerStatus?.lastCheer ? (
+              <p className="text-[10px] text-[#A83232] font-semibold truncate -mt-0.5 flex items-center gap-1">
+                <span>💬</span>
+                <span className="truncate">
+                  {partnerStatus.lastCheer.fromId === currentUserId ? 'You:' : `${partnerName}:`} "{partnerStatus.lastCheer.text}"
+                </span>
+              </p>
+            ) : partnerStatus?.customNote ? (
               <p className="text-[10px] text-[#7A6855] italic font-handwriting text-sm truncate -mt-0.5">
                 "{partnerStatus.customNote}"
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Action Badge: "✨ NEW" if unseen, "React" if already viewed */}
@@ -146,13 +153,27 @@ export default function CoupleStatusBanner({
             }
           }}
           className="shrink-0 w-[46px] h-[48px] sm:w-[50px] sm:h-[52px] rounded-2xl bg-white/95 hover:bg-white border border-[#D2C3B0] hover:border-[#A83232] shadow-xs flex items-center justify-center relative cursor-pointer hover:scale-105 active:scale-95 transition-all group"
-          title={myStatus ? `Your Status: ${myStatus.statusText} • Tap to view/change` : 'Tap to set your live status note'}
+          title={
+            myStatus?.lastCheer && myStatus.lastCheer.fromId !== currentUserId
+              ? `💬 ${partnerName} cheered: "${myStatus.lastCheer.text}" • Tap to view`
+              : myStatus ? `Your Status: ${myStatus.statusText} • Tap to view/change` : 'Tap to set your live status note'
+          }
           aria-label="My status"
         >
           {/* Active Status Emoji */}
           <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform select-none">
             {myStatus?.emoji || '💬'}
           </span>
+
+          {/* Partner Cheered Mini Badge */}
+          {myStatus?.lastCheer && myStatus.lastCheer.fromId !== currentUserId && (
+            <span 
+              className="absolute -top-1.5 -left-1.5 bg-[#A83232] text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] border border-white shadow-xs animate-bounce" 
+              title={`${partnerName} cheered: "${myStatus.lastCheer.text}"`}
+            >
+              💬
+            </span>
+          )}
 
           {/* Mini Edit Pencil Badge */}
           <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#A83232] text-[#F8E3B6] border border-white flex items-center justify-center shadow-xs">

@@ -21,6 +21,7 @@ export default function StatusDetailModal({
   currentUser,
   pairInfo,
   onReactToStatus,
+  onSendCheer,
   onMarkStatusAsViewed,
   onOpenStatusPicker
 }) {
@@ -115,8 +116,12 @@ export default function StatusDetailModal({
   };
 
   const handleSendCheer = (cheerText) => {
-    // Send cheer reaction
-    handleReactionTap('💬');
+    if (!targetUserId) return;
+    if (onSendCheer) {
+      onSendCheer(targetUserId, cheerText);
+    } else {
+      handleReactionTap('💬');
+    }
     setSentCheer(cheerText);
     setTimeout(() => setSentCheer(null), 3000);
   };
@@ -193,6 +198,26 @@ export default function StatusDetailModal({
                 <p className="text-xs font-handwriting text-base text-[#A83232] bg-[#FAF5EC] border border-[#D2C3B0]/60 py-1 px-3 rounded-full inline-block shadow-xs">
                   "{targetStatus.customNote}"
                 </p>
+              )}
+
+              {/* Sweet Cheer Display Card */}
+              {targetStatus.lastCheer && (
+                <div className="mx-auto max-w-xs p-2.5 rounded-2xl bg-white border border-[#D4AF37]/80 shadow-xs space-y-1 animate-fadeIn text-left mt-2">
+                  <div className="flex items-center justify-between text-[10px] text-[#9E8B75]">
+                    <span className="font-bold text-[#A83232] flex items-center gap-1">
+                      <span className="text-xs">💬</span>
+                      <span>
+                        {targetStatus.lastCheer.fromId === currentUserId 
+                          ? 'You cheered:' 
+                          : `${targetStatus.lastCheer.fromName || partnerName} cheered:`}
+                      </span>
+                    </span>
+                    <span className="text-[9px]">{getTimeAgo(targetStatus.lastCheer.atIso)}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-[#36271C] font-serif-vintage italic leading-snug">
+                    "{targetStatus.lastCheer.text}"
+                  </p>
+                </div>
               )}
 
               <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#9E8B75] pt-1">

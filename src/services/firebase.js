@@ -908,6 +908,89 @@ export async function reactToStatus(pairCode, targetUserId, user, emoji) {
   return null;
 }
 
+export async function sendCheerToStatus(pairCode, targetUserId, user, cheerText) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  const cheerObj = {
+    text: cheerText,
+    fromName: userName,
+    fromId: userId,
+    atIso: timestamp
+  };
+
+  if (isFirebaseConfigured && db) {
+    const statusRef = doc(db, 'pairs', cleanCode, 'statuses', targetUserId);
+    const snap = await getDoc(statusRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentCheers = Array.isArray(data.cheers) ? data.cheers : [];
+      const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
+
+      // Increment '💬' reaction count
+      const currentReactions = data.reactions || {};
+      const emojiData = currentReactions['💬'] || { count: 0, userCounts: {}, users: [] };
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      const myCount = Number(userCounts[userId]) || 0;
+      userCounts[userId] = Math.min(10, myCount + 1);
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!newUsers.includes(userId)) newUsers.push(userId);
+
+      const updatedReactions = {
+        ...currentReactions,
+        ['💬']: {
+          count: totalCount,
+          userCounts,
+          users: newUsers,
+          lastReactedBy: userName,
+          lastReactedAt: timestamp
+        }
+      };
+
+      await updateDoc(statusRef, {
+        lastCheer: cheerObj,
+        cheers: updatedCheers,
+        reactions: updatedReactions
+      });
+      return { lastCheer: cheerObj, cheers: updatedCheers, reactions: updatedReactions };
+    }
+  }
+
+  // Local storage fallback
+  const local = getLocalStatuses();
+  const pairStatuses = local[cleanCode] || {};
+  const status = pairStatuses[targetUserId];
+  if (status) {
+    const currentCheers = Array.isArray(status.cheers) ? status.cheers : [];
+    const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
+    status.lastCheer = cheerObj;
+    status.cheers = updatedCheers;
+
+    status.reactions = status.reactions || {};
+    const emojiData = status.reactions['💬'] || { count: 0, userCounts: {}, users: [] };
+    const userCounts = { ...(emojiData.userCounts || {}) };
+    const myCount = Number(userCounts[userId]) || 0;
+    userCounts[userId] = Math.min(10, myCount + 1);
+    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+    const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+    if (!newUsers.includes(userId)) newUsers.push(userId);
+
+    status.reactions['💬'] = {
+      count: totalCount,
+      userCounts,
+      users: newUsers,
+      lastReactedBy: userName,
+      lastReactedAt: timestamp
+    };
+    saveLocalStatuses(local);
+    return { lastCheer: cheerObj, cheers: updatedCheers, reactions: status.reactions };
+  }
+  return null;
+}
+
 export async function markStatusAsViewed(pairCode, targetUserId, user) {
   const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
   const userId = user?.uid || 'demo-user-1';
