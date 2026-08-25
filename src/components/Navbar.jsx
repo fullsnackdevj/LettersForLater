@@ -19,6 +19,7 @@ export default function Navbar({
   pairInfo, 
   isLettersUnlocked,
   stories = [],
+  statuses = {},
   hasSeenStoriesIntro = false,
   onOpenAuth, 
   onOpenPairing, 
@@ -27,7 +28,9 @@ export default function Navbar({
   onOpenStoryViewer,
   onOpenStoryCreator,
   onOpenStoryArchive,
-  onOpenStoryIntro
+  onOpenStoryIntro,
+  onOpenStatusPicker,
+  onOpenStatusDetail
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));
@@ -59,12 +62,16 @@ export default function Navbar({
   const myActiveStories = activeStories.filter(s => s.authorId === currentUserId);
   const partnerActiveStories = activeStories.filter(s => s.authorId !== currentUserId);
 
+  // Status notes
+  const myStatus = statuses?.[currentUserId];
+  const partnerStatus = Object.values(statuses || {}).find(s => s.userId !== currentUserId);
+
   // Check if there are UNSEEN stories for the logged-in user
   const myHasUnseen = myActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
   const partnerHasUnseen = partnerActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
 
   return (
-    <header className="sticky top-0 z-40 bg-[#F6F2EB]/95 backdrop-blur-md border-b border-[#E2D7C7] px-3 sm:px-4 lg:px-8 py-2.5 sm:py-3 transition-all shadow-sm">
+    <header className="sticky top-0 z-40 bg-[#F6F2EB]/95 backdrop-blur-md border-b border-[#E2D7C7] px-3 sm:px-4 lg:px-8 py-2 sm:py-2.5 transition-all shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Brand & Logo */}
@@ -127,7 +134,7 @@ export default function Navbar({
                 />
               </button>
 
-              {/* Dedicated Large Touch-Target Plus Button (Always accessible to add another story!) */}
+              {/* Dedicated Large Touch-Target Plus Button */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -154,7 +161,6 @@ export default function Navbar({
                   if (partnerActiveStories.length > 0) {
                     onOpenStoryViewer(partnerActiveStories);
                   } else {
-                    // Partner has no active stories — show friendly toast
                     setPartnerNoStoryToast(true);
                     setTimeout(() => setPartnerNoStoryToast(false), 3000);
                   }

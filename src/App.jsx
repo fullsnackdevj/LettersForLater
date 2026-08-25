@@ -15,6 +15,9 @@ import StoryCreatorModal from './components/StoryCreatorModal';
 import StoryViewerModal from './components/StoryViewerModal';
 import StoryArchiveModal from './components/StoryArchiveModal';
 import StoryIntroModal from './components/StoryIntroModal';
+import StatusPickerModal from './components/StatusPickerModal';
+import StatusDetailModal from './components/StatusDetailModal';
+import CoupleStatusBanner from './components/CoupleStatusBanner';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -31,7 +34,11 @@ import {
   subscribeToStories,
   reactToStory,
   markStoryAsViewed,
-  deleteStoryFromCloud
+  deleteStoryFromCloud,
+  updateUserStatus,
+  subscribeToStatuses,
+  reactToStatus,
+  markStatusAsViewed
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -76,6 +83,12 @@ export default function App() {
   const [viewerStories, setViewerStories] = useState([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
 
+  // Live Status Notes ("What We're Currently Doing")
+  const [statuses, setStatuses] = useState({});
+  const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
+  const [isStatusDetailOpen, setIsStatusDetailOpen] = useState(false);
+  const [selectedStatusForDetail, setSelectedStatusForDetail] = useState(null);
+
   const [selectedLetter, setSelectedLetter] = useState(null);
 
   // Subscribe to Auth State & auto-manage Auth Modal
@@ -116,6 +129,15 @@ export default function App() {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const unsubscribe = subscribeToStories(pairCode, (fetchedStories) => {
       setStories(fetchedStories);
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Couple Live Status Notes ("What We're Currently Doing")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToStatuses(pairCode, (fetchedStatuses) => {
+      setStatuses(fetchedStatuses || {});
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
@@ -282,6 +304,95 @@ export default function App() {
     setIsStoryViewerOpen(false);
   }, []);
 
+  // Couple Live Status Note Handlers
+  const handleSaveUserStatus = useCallback(async (statusData) => {
+    if (!user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const userId = user.uid || 'demo-user-1';
+    const saved = await updateUserStatus(pairCode, user, statusData);
+    setStatuses(prev => ({
+      ...prev,
+      [userId]: saved
+    }));
+  }, [pairInfo?.code, user]);
+
+  const handleReactToStatus = useCallback(async (targetUserId, emoji) => {
+    if (!targetUserId || !user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user.uid || 'demo-user-1';
+    const currentUserName = user.displayName || 'Partner';
+    const timestamp = new Date().toISOString();
+
+    // Optimistic local state update
+    setStatuses(prev => {
+      const target = prev[targetUserId];
+      if (!target) return prev;
+      const reactions = { ...(target.reactions || {}) };
+      const emojiData = reactions[emoji] || { count: 0, userCounts: {}, users: [] };
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      const myCount = Number(userCounts[currentUserId]) || 0;
+      if (myCount >= 10) return prev;
+
+      userCounts[currentUserId] = myCount + 1;
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+      const users = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!users.includes(currentUserId)) users.push(currentUserId);
+
+      reactions[emoji] = {
+        count: totalCount,
+        userCounts,
+        users,
+        lastReactedBy: currentUserName,
+        lastReactedAt: timestamp
+      };
+
+      const updatedDoc = {
+        ...target,
+        reactions
+      };
+
+      if (selectedStatusForDetail?.userId === targetUserId) {
+        setSelectedStatusForDetail(updatedDoc);
+      }
+
+      return {
+        ...prev,
+        [targetUserId]: updatedDoc
+      };
+    });
+
+    await reactToStatus(pairCode, targetUserId, user, emoji);
+  }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
+
+  const handleMarkStatusAsViewed = useCallback(async (targetUserId) => {
+    if (!targetUserId || !user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user.uid || 'demo-user-1';
+
+    setStatuses(prev => {
+      const target = prev[targetUserId];
+      if (!target) return prev;
+      const viewedBy = Array.isArray(target.viewedBy) ? target.viewedBy : [];
+      if (viewedBy.includes(currentUserId)) return prev;
+
+      const updatedDoc = {
+        ...target,
+        viewedBy: [...viewedBy, currentUserId]
+      };
+
+      if (selectedStatusForDetail?.userId === targetUserId) {
+        setSelectedStatusForDetail(updatedDoc);
+      }
+
+      return {
+        ...prev,
+        [targetUserId]: updatedDoc
+      };
+    });
+
+    await markStatusAsViewed(pairCode, targetUserId, user);
+  }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
+
   // Sync viewerStories with latest live story metadata (reactions, views) without resetting viewer slide
   useEffect(() => {
     if (isStoryViewerOpen && viewerStories.length > 0) {
@@ -341,6 +452,20 @@ export default function App() {
         onOpenStoryArchive={() => setIsStoryArchiveOpen(true)}
         onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
       />
+
+      {/* Couple Live Status Ribbon ("What We're Currently Doing") */}
+      {user && isAppUnlocked && !isAuthOpen && (
+        <CoupleStatusBanner
+          user={user}
+          pairInfo={pairInfo}
+          statuses={statuses}
+          onOpenStatusPicker={() => setIsStatusPickerOpen(true)}
+          onOpenStatusDetail={(statusDoc) => {
+            setSelectedStatusForDetail(statusDoc);
+            setIsStatusDetailOpen(true);
+          }}
+        />
+      )}
 
       {/* View Switcher Bar (Vault vs Timeline) */}
       <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-3 py-2 flex flex-wrap justify-center gap-2 max-w-full overflow-x-auto">
@@ -566,6 +691,33 @@ export default function App() {
             storyIntroPendingAction();
             setStoryIntroPendingAction(null);
           }
+        }}
+      />
+
+      {/* Couple Live Status Picker Modal ("What are you doing right now?") */}
+      <StatusPickerModal
+        isOpen={isStatusPickerOpen}
+        onClose={() => setIsStatusPickerOpen(false)}
+        currentStatus={statuses[user?.uid || 'demo-user-1']}
+        currentUser={user}
+        onSaveStatus={handleSaveUserStatus}
+      />
+
+      {/* Couple Live Status Detail / Reaction Modal */}
+      <StatusDetailModal
+        isOpen={isStatusDetailOpen}
+        onClose={() => {
+          setIsStatusDetailOpen(false);
+          setSelectedStatusForDetail(null);
+        }}
+        targetStatus={selectedStatusForDetail}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onReactToStatus={handleReactToStatus}
+        onMarkStatusAsViewed={handleMarkStatusAsViewed}
+        onOpenStatusPicker={() => {
+          setIsStatusDetailOpen(false);
+          setIsStatusPickerOpen(true);
         }}
       />
 

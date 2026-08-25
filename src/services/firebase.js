@@ -746,5 +746,205 @@ export async function deleteStoryFromCloud(pairCode, storyId) {
   saveLocalStories(localStories);
 }
 
+/**
+ * Couple Live Status & Notes Services ("What We're Currently Doing")
+ */
+const LOCAL_STATUSES_KEY = 'lettersforlater_couple_statuses_v1';
+
+function getLocalStatuses() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STATUSES_KEY) : null;
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalStatuses(data) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STATUSES_KEY, JSON.stringify(data));
+    }
+  } catch {}
+}
+
+export async function updateUserStatus(pairCode, user, statusData) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Jay';
+  const userPhoto = user?.photoURL || '';
+  const pht = getCurrentPHT();
+
+  const statusDoc = {
+    userId,
+    userName,
+    userPhoto,
+    statusId: statusData.statusId || 'working_now',
+    statusText: statusData.statusText || 'Working now',
+    emoji: statusData.emoji || '💻',
+    category: statusData.category || 'work_school',
+    customNote: statusData.customNote || '',
+    updatedAtPHT: pht.fullString,
+    updatedAtIso: pht.isoString,
+    reactions: {},
+    viewedBy: [userId]
+  };
+
+  if (isFirebaseConfigured && db) {
+    const statusRef = doc(db, 'pairs', cleanCode, 'statuses', userId);
+    await setDoc(statusRef, {
+      ...statusDoc,
+      serverTime: serverTimestamp()
+    }, { merge: true });
+    return statusDoc;
+  }
+
+  // Local storage fallback
+  const local = getLocalStatuses();
+  const pairStatuses = local[cleanCode] || {};
+  pairStatuses[userId] = statusDoc;
+  local[cleanCode] = pairStatuses;
+  saveLocalStatuses(local);
+  return statusDoc;
+}
+
+export function subscribeToStatuses(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const statusesCol = collection(db, 'pairs', cleanCode, 'statuses');
+    return onSnapshot(statusesCol, (snapshot) => {
+      const statusesMap = {};
+      snapshot.forEach((docSnap) => {
+        statusesMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+      });
+      callback(statusesMap);
+    });
+  }
+
+  // Fallback local polling subscription
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_STATUSES_KEY) || '{}';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      const local = getLocalStatuses();
+      callback(local[cleanCode] || {});
+    }
+  }, 1000);
+
+  const initial = getLocalStatuses()[cleanCode] || {};
+  lastJson = localStorage.getItem(LOCAL_STATUSES_KEY) || JSON.stringify(initial);
+  callback(initial);
+
+  return () => clearInterval(pollInterval);
+}
+
+export async function reactToStatus(pairCode, targetUserId, user, emoji) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const statusRef = doc(db, 'pairs', cleanCode, 'statuses', targetUserId);
+    const snap = await getDoc(statusRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentReactions = data.reactions || {};
+      const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      const myCount = Number(userCounts[userId]) || 0;
+
+      if (myCount >= 10) return currentReactions;
+
+      userCounts[userId] = myCount + 1;
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!newUsers.includes(userId)) newUsers.push(userId);
+
+      const updatedReactions = {
+        ...currentReactions,
+        [emoji]: {
+          count: totalCount,
+          userCounts,
+          users: newUsers,
+          lastReactedBy: userName,
+          lastReactedAt: timestamp
+        }
+      };
+
+      await updateDoc(statusRef, { reactions: updatedReactions });
+      return updatedReactions;
+    }
+  }
+
+  // Local storage fallback
+  const local = getLocalStatuses();
+  const pairStatuses = local[cleanCode] || {};
+  const status = pairStatuses[targetUserId];
+  if (status) {
+    status.reactions = status.reactions || {};
+    const emojiData = status.reactions[emoji] || { count: 0, userCounts: {}, users: [] };
+    const userCounts = { ...(emojiData.userCounts || {}) };
+    const myCount = Number(userCounts[userId]) || 0;
+
+    if (myCount >= 10) return status.reactions;
+
+    userCounts[userId] = myCount + 1;
+    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+    const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+    if (!newUsers.includes(userId)) newUsers.push(userId);
+
+    status.reactions[emoji] = {
+      count: totalCount,
+      userCounts,
+      users: newUsers,
+      lastReactedBy: userName,
+      lastReactedAt: timestamp
+    };
+    saveLocalStatuses(local);
+    return status.reactions;
+  }
+  return null;
+}
+
+export async function markStatusAsViewed(pairCode, targetUserId, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const statusRef = doc(db, 'pairs', cleanCode, 'statuses', targetUserId);
+    const snap = await getDoc(statusRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const viewedBy = Array.isArray(data.viewedBy) ? data.viewedBy : [];
+      if (!viewedBy.includes(userId)) {
+        await updateDoc(statusRef, {
+          viewedBy: [...viewedBy, userId],
+          [`seenAt_${userId}`]: timestamp,
+          lastSeenByName: userName
+        });
+      }
+    }
+    return;
+  }
+
+  // Local storage fallback
+  const local = getLocalStatuses();
+  const pairStatuses = local[cleanCode] || {};
+  const status = pairStatuses[targetUserId];
+  if (status) {
+    status.viewedBy = Array.isArray(status.viewedBy) ? status.viewedBy : [];
+    if (!status.viewedBy.includes(userId)) {
+      status.viewedBy.push(userId);
+      status[`seenAt_${userId}`] = timestamp;
+      status.lastSeenByName = userName;
+      saveLocalStatuses(local);
+    }
+  }
+}
+
 
 
