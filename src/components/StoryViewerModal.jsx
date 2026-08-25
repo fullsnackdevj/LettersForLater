@@ -3,9 +3,7 @@ import {
   X, 
   ChevronLeft, 
   ChevronRight, 
-  Sparkles, 
   Trash2, 
-  Bookmark, 
   Download, 
   Check, 
   Eye, 
@@ -49,15 +47,58 @@ export default function StoryViewerModal({
   // Custom Save to Vault / Letter Confirmation Modal State
   const [showVaultConfirm, setShowVaultConfirm] = useState(false);
 
-  const touchStartXRef = useRef(0);
-  const touchEndXRef = useRef(0);
-  const pressTimerRef = useRef(null);
-  const isHoldingRef = useRef(false);
+  // High precision timer and animation frame tracking
+  const rafIdRef = useRef(null);
+  const elapsedMsRef = useRef(0);
+  const lastTimeRef = useRef(null);
 
-  // Sync initial story index when opened
+  // Gesture and touch refs
+  const touchStartRef = useRef(null);
+  const pointerDownTimeRef = useRef(0);
+  const isHoldingRef = useRef(false);
+  const holdTimeoutRef = useRef(null);
+
+  // Image preloader cache
+  const preloadedUrlsRef = useRef(new Set());
+
+  // Helper to preload images for instant zero-lag switching
+  const preloadImage = useCallback((url) => {
+    if (!url || preloadedUrlsRef.current.has(url)) return;
+    preloadedUrlsRef.current.add(url);
+    const img = new Image();
+    img.src = url;
+    if (img.decode) {
+      img.decode().catch(() => {});
+    }
+  }, []);
+
+  // Preload adjacent images whenever stories or currentIndex change
+  useEffect(() => {
+    if (!isOpen || !stories.length) return;
+
+    // Current story
+    if (stories[currentIndex]?.mediaUrl) {
+      preloadImage(stories[currentIndex].mediaUrl);
+    }
+    // Next 2 stories
+    if (stories[currentIndex + 1]?.mediaUrl) {
+      preloadImage(stories[currentIndex + 1].mediaUrl);
+    }
+    if (stories[currentIndex + 2]?.mediaUrl) {
+      preloadImage(stories[currentIndex + 2].mediaUrl);
+    }
+    // Previous story
+    if (stories[currentIndex - 1]?.mediaUrl) {
+      preloadImage(stories[currentIndex - 1].mediaUrl);
+    }
+  }, [isOpen, stories, currentIndex, preloadImage]);
+
+  // Sync initial story index when modal opens
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(Math.min(Math.max(initialStoryIndex, 0), Math.max(0, stories.length - 1)));
+      const validIndex = Math.min(Math.max(initialStoryIndex, 0), Math.max(0, stories.length - 1));
+      setCurrentIndex(validIndex);
+      elapsedMsRef.current = 0;
       setProgress(0);
       setIsMenuOpen(false);
       setIsPaused(false);
@@ -67,13 +108,15 @@ export default function StoryViewerModal({
     }
   }, [isOpen, initialStoryIndex, stories.length]);
 
-  // Adjust index or auto-close if all stories were deleted
+  // Auto-close if all stories were deleted or clamp index
   useEffect(() => {
     if (isOpen) {
       if (stories.length === 0) {
         onClose();
       } else if (currentIndex >= stories.length) {
         setCurrentIndex(Math.max(0, stories.length - 1));
+        elapsedMsRef.current = 0;
+        setProgress(0);
       }
     }
   }, [stories.length, currentIndex, isOpen, onClose]);
@@ -82,15 +125,19 @@ export default function StoryViewerModal({
   const currentUserId = currentUser?.uid || 'demo-user-1';
   const isAuthor = currentStory?.authorId === currentUserId;
 
-  // Automatically mark current story as viewed
+  // Automatically mark current story as viewed (only if not already marked to prevent render spam)
   useEffect(() => {
     if (isOpen && currentStory && onMarkAsViewed) {
-      onMarkAsViewed(currentStory.id);
+      const viewedList = Array.isArray(currentStory.viewedBy) ? currentStory.viewedBy : [];
+      if (!viewedList.includes(currentUserId)) {
+        onMarkAsViewed(currentStory.id);
+      }
     }
-  }, [isOpen, currentStory, onMarkAsViewed]);
+  }, [isOpen, currentStory, currentUserId, onMarkAsViewed]);
 
   // Move to next story or close if at end
   const handleNext = useCallback(() => {
+    elapsedMsRef.current = 0;
     setProgress(0);
     setIsMenuOpen(false);
     if (currentIndex < stories.length - 1) {
@@ -103,6 +150,7 @@ export default function StoryViewerModal({
 
   // Move to previous story
   const handlePrev = useCallback(() => {
+    elapsedMsRef.current = 0;
     setProgress(0);
     setIsMenuOpen(false);
     if (currentIndex > 0) {
@@ -111,32 +159,60 @@ export default function StoryViewerModal({
     }
   }, [currentIndex]);
 
-  // 15-second progress ticker for active story slide
+  // High-Precision RAF Timer Engine for active story slide
   useEffect(() => {
     if (!isOpen || showDeleteConfirm || showVaultConfirm || isMenuOpen || isPaused || !currentStory) {
+      lastTimeRef.current = null;
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       return;
     }
 
-    const intervalMs = 50;
-    const increment = (intervalMs / STORY_DURATION_MS) * 100;
+    let isMounted = true;
 
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          handleNext();
-          return 0;
+    const tick = (now) => {
+      if (!isMounted) return;
+
+      if (lastTimeRef.current != null) {
+        const delta = now - lastTimeRef.current;
+        // Avoid jumps if browser tab was throttled/backgrounded
+        if (delta > 0 && delta < 500) {
+          elapsedMsRef.current += delta;
         }
-        return prev + increment;
-      });
-    }, intervalMs);
+      }
+      lastTimeRef.current = now;
 
-    return () => clearInterval(timer);
+      const currentPct = Math.min((elapsedMsRef.current / STORY_DURATION_MS) * 100, 100);
+      setProgress(currentPct);
+
+      if (elapsedMsRef.current >= STORY_DURATION_MS) {
+        handleNext();
+      } else {
+        rafIdRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    lastTimeRef.current = performance.now();
+    rafIdRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      isMounted = false;
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      lastTimeRef.current = null;
+    };
   }, [isOpen, showDeleteConfirm, showVaultConfirm, isMenuOpen, isPaused, currentStory, handleNext]);
 
   // Reset progress when index changes
   useEffect(() => {
+    elapsedMsRef.current = 0;
     setProgress(0);
     setIsMenuOpen(false);
+    lastTimeRef.current = null;
   }, [currentIndex]);
 
   // Keyboard navigation & escape listener
@@ -145,10 +221,13 @@ export default function StoryViewerModal({
 
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
         handleNext();
       } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
         handlePrev();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         if (isMenuOpen) {
           setIsMenuOpen(false);
         } else {
@@ -161,69 +240,100 @@ export default function StoryViewerModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, showDeleteConfirm, showVaultConfirm, isMenuOpen, handleNext, handlePrev, onClose]);
 
-  // Pointer hold handlers to pause 15s timer (like Instagram hold-to-pause)
-  const handlePointerDown = () => {
+  // Unified Pointer & Touch Gesture Handling (Zero-Lag + Instant Response)
+  const handlePointerDown = (e) => {
     if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
+    if (e.button !== undefined && e.button !== 0) return; // Only primary mouse button
+
     isHoldingRef.current = false;
-    pressTimerRef.current = setTimeout(() => {
+    pointerDownTimeRef.current = Date.now();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    touchStartRef.current = { x: clientX, y: clientY };
+
+    if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+    holdTimeoutRef.current = setTimeout(() => {
       isHoldingRef.current = true;
       setIsPaused(true);
     }, 180);
   };
 
-  const handlePointerUp = () => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
+  const handlePointerMove = (e) => {
+    if (!touchStartRef.current) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const diffX = Math.abs(clientX - touchStartRef.current.x);
+    const diffY = Math.abs(clientY - touchStartRef.current.y);
+
+    // If moved more than threshold, cancel hold
+    if (diffX > 15 || diffY > 15) {
+      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
     }
-    if (isHoldingRef.current) {
-      setIsPaused(false);
-      setTimeout(() => {
-        isHoldingRef.current = false;
-      }, 50);
+  };
+
+  const handlePointerUp = (e) => {
+    if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+    const wasHolding = isHoldingRef.current;
+    isHoldingRef.current = false;
+    setIsPaused(false);
+
+    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
+    if (!touchStartRef.current) return;
+
+    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const diffX = clientX - touchStartRef.current.x;
+    const diffY = clientY - touchStartRef.current.y;
+    const holdDuration = Date.now() - (pointerDownTimeRef.current || 0);
+    touchStartRef.current = null;
+
+    // If user was holding down to pause, just resume without navigating
+    if (wasHolding || holdDuration > 220) {
       return;
     }
-    setIsPaused(false);
-  };
 
-  // Handle Touch Swipes for mobile
-  const handleTouchStart = (e) => {
-    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
-    touchStartXRef.current = e.touches[0].clientX;
-    touchEndXRef.current = e.touches[0].clientX;
-    handlePointerDown();
-  };
-
-  const handleTouchMove = (e) => {
-    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
-    touchEndXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    handlePointerUp();
-    if (showDeleteConfirm || showVaultConfirm || isMenuOpen) return;
-    const diff = touchStartXRef.current - touchEndXRef.current;
-    if (diff > 45) {
-      handleNext();
-    } else if (diff < -45) {
-      handlePrev();
+    // Swipe threshold check
+    if (Math.abs(diffX) > 35 && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX > 0) {
+        handlePrev(); // Swiped right -> previous
+      } else {
+        handleNext(); // Swiped left -> next
+      }
+      return;
     }
-  };
 
-  // Handle tap on left/right edges of screen
-  const handleClickNavigate = (e) => {
-    if (showDeleteConfirm || showVaultConfirm || isMenuOpen || isHoldingRef.current) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x < rect.width * 0.35) {
+    // Tap Navigation: Left 35% -> previous, Right 65% -> next
+    const container = e.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const tapX = clientX - rect.left;
+
+    if (tapX < rect.width * 0.35) {
       handlePrev();
     } else {
       handleNext();
     }
   };
 
-  // Trigger floating emoji reaction (Only for partner viewing story)
+  const handlePointerCancel = () => {
+    if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+    isHoldingRef.current = false;
+    setIsPaused(false);
+    touchStartRef.current = null;
+  };
+
+  // Trigger floating emoji reaction (Both users can react, max 10 per emoji per user)
   const handleSendReaction = (emoji) => {
-    if (!currentStory || isAuthor) return;
+    if (!currentStory) return;
+
+    const emojiData = currentStory.reactions?.[emoji];
+    const userCounts = emojiData?.userCounts || {};
+    let myCount = Number(userCounts[currentUserId]);
+    if (myCount === undefined || isNaN(myCount)) {
+      myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
+    }
+
+    if (myCount >= 10) return; // Max 10 reached for this user
 
     // Haptic feedback
     if (typeof window !== 'undefined' && window.navigator?.vibrate) {
@@ -234,10 +344,10 @@ export default function StoryViewerModal({
     const newParticles = Array.from({ length: 6 }).map((_, idx) => ({
       id: Date.now() + idx + Math.random(),
       emoji,
-      left: 20 + Math.random() * 60,
+      left: 15 + Math.random() * 70,
       scale: 0.8 + Math.random() * 0.5,
       rotation: Math.random() * 40 - 20,
-      delay: idx * 0.05
+      delay: idx * 0.04
     }));
 
     setFloatingParticles(prev => [...prev, ...newParticles]);
@@ -344,13 +454,9 @@ export default function StoryViewerModal({
   const isViewedByPartner = viewedList.some(id => id !== currentStory.authorId);
   const isViewedByBoth = viewedList.length >= 2;
 
-  // Active reactions on this story
-  const receivedReactions = Object.entries(currentStory.reactions || {}).filter(
-    ([_, r]) => (r.count || 0) > 0
-  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-fadeIn select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-fadeIn select-none touch-none">
       
       {/* Floating Reactions Overlay */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
@@ -372,22 +478,32 @@ export default function StoryViewerModal({
       {/* Left Desktop Arrow */}
       {currentIndex > 0 && !showDeleteConfirm && !showVaultConfirm && (
         <button
-          onClick={handlePrev}
-          className="hidden md:flex absolute left-4 lg:left-12 z-30 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white items-center justify-center transition-all hover:scale-110 shadow-lg"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePrev();
+          }}
+          className="hidden md:flex absolute left-4 lg:left-12 z-30 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 active:scale-95 text-white items-center justify-center transition-all hover:scale-110 shadow-xl cursor-pointer border border-white/20"
           title="Previous Story"
+          aria-label="Previous story"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
         </button>
       )}
 
       {/* Right Desktop Arrow */}
       {currentIndex < stories.length - 1 && !showDeleteConfirm && !showVaultConfirm && (
         <button
-          onClick={handleNext}
-          className="hidden md:flex absolute right-4 lg:right-12 z-30 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white items-center justify-center transition-all hover:scale-110 shadow-lg"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleNext();
+          }}
+          className="hidden md:flex absolute right-4 lg:right-12 z-30 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 active:scale-95 text-white items-center justify-center transition-all hover:scale-110 shadow-xl cursor-pointer border border-white/20"
           title="Next Story"
+          aria-label="Next story"
         >
-          <ChevronRight className="w-6 h-6" />
+          <ChevronRight className="w-6 h-6 stroke-[2.5]" />
         </button>
       )}
 
@@ -397,31 +513,35 @@ export default function StoryViewerModal({
         {/* ─────────────────────────────────────────────────────────────
             TOP HEADER: Segmented Progress (15s) & Clean Profile Bar
            ───────────────────────────────────────────────────────────── */}
-        <div className="relative z-30 p-3 sm:p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent space-y-2.5">
+        <div className="relative z-30 p-3 sm:p-4 bg-gradient-to-b from-black/85 via-black/50 to-transparent space-y-2.5">
           
-          {/* Segmented Progress Nodes (15s smooth auto-fill) */}
+          {/* Segmented Progress Nodes (High-Precision 15s RAF auto-fill) */}
           <div className="flex items-center gap-1.5 w-full">
             {stories.map((s, idx) => {
-              let width = '0%';
-              if (idx < currentIndex) width = '100%';
-              else if (idx === currentIndex) width = `${Math.min(progress, 100)}%`;
+              let widthPct = 0;
+              if (idx < currentIndex) {
+                widthPct = 100;
+              } else if (idx === currentIndex) {
+                widthPct = progress;
+              }
 
               return (
                 <div 
                   key={s.id || idx}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (!showDeleteConfirm && !showVaultConfirm) {
+                      elapsedMsRef.current = 0;
                       setProgress(0);
                       setCurrentIndex(idx);
                     }
                   }}
-                  className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer"
+                  className="flex-1 h-1.5 bg-white/25 rounded-full overflow-hidden cursor-pointer p-0 select-none shadow-xs"
                 >
                   <div 
-                    className="h-full bg-white rounded-full transition-all ease-linear"
+                    className="h-full bg-white rounded-full transition-none will-change-[width]"
                     style={{ 
-                      width,
-                      transitionDuration: idx === currentIndex ? '50ms' : '200ms'
+                      width: `${widthPct}%`
                     }}
                   />
                 </div>
@@ -485,9 +605,13 @@ export default function StoryViewerModal({
               {/* Close Button */}
               <button
                 type="button"
-                onClick={onClose}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
                 className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
                 title="Close"
+                aria-label="Close story viewer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -576,25 +700,24 @@ export default function StoryViewerModal({
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            MAIN STORY PHOTO CONTENT
+            MAIN STORY PHOTO CONTENT (Unified Gesture / Tap Handler)
            ───────────────────────────────────────────────────────────── */}
         <div 
-          className="relative flex-1 flex items-center justify-center overflow-hidden cursor-pointer bg-black"
-          onClick={handleClickNavigate}
-          onMouseDown={handlePointerDown}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={handlePointerUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          className="relative flex-1 flex items-center justify-center overflow-hidden cursor-pointer bg-black select-none touch-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onContextMenu={(e) => e.preventDefault()}
         >
           {currentStory.mediaUrl ? (
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center transition-opacity duration-150 ease-out">
               <img
                 src={currentStory.mediaUrl}
                 alt="Story"
-                className="w-full h-full object-contain sm:object-cover pointer-events-none"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-contain sm:object-cover pointer-events-none select-none transition-transform duration-200"
               />
               
               {/* Optional Polaroid tape effect on top */}
@@ -607,13 +730,20 @@ export default function StoryViewerModal({
             </div>
           )}
 
-          {/* Subtle Left / Right tap hints on edges */}
+          {/* Subtle Left / Right tap indicator hints on edges */}
           <div className="absolute left-2 inset-y-0 w-8 flex items-center justify-start opacity-0 hover:opacity-40 transition-opacity pointer-events-none text-white">
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </div>
           <div className="absolute right-2 inset-y-0 w-8 flex items-center justify-end opacity-0 hover:opacity-40 transition-opacity pointer-events-none text-white">
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
           </div>
+
+          {/* Pause Indicator overlay on long press */}
+          {isPaused && !showDeleteConfirm && !showVaultConfirm && !isMenuOpen && (
+            <div className="absolute top-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-white/80 border border-white/20 animate-fadeIn pointer-events-none">
+              ⏸ Paused
+            </div>
+          )}
 
           {/* ─────────────────────────────────────────────────────────────
               CUSTOM DELETE CONFIRMATION DIALOG OVERLAY
@@ -639,17 +769,19 @@ export default function StoryViewerModal({
 
                 <div className="flex items-center gap-2 pt-1">
                   <button
+                    type="button"
                     onClick={() => setShowDeleteConfirm(false)}
                     disabled={isDeleting}
-                    className="flex-1 py-2 rounded-xl border border-[#D2C3B0] bg-white text-xs font-bold text-[#5C4A3A] hover:bg-[#EFE9DE] transition-colors"
+                    className="flex-1 py-2 rounded-xl border border-[#D2C3B0] bg-white text-xs font-bold text-[#5C4A3A] hover:bg-[#EFE9DE] transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
 
                   <button
+                    type="button"
                     onClick={handleConfirmDelete}
                     disabled={isDeleting}
-                    className="flex-1 py-2 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1 disabled:opacity-50"
+                    className="flex-1 py-2 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                   >
                     {isDeleting ? (
                       <div className="w-3.5 h-3.5 border-2 border-[#F8E3B6] border-t-transparent rounded-full animate-spin" />
@@ -686,16 +818,18 @@ export default function StoryViewerModal({
 
                 <div className="flex flex-col gap-2 pt-1">
                   <button
+                    type="button"
                     onClick={handleConfirmOpenLetterEditor}
-                    className="w-full py-2.5 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 border border-[#D4AF37]/50"
+                    className="w-full py-2.5 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 border border-[#D4AF37]/50 cursor-pointer"
                   >
                     <Mail className="w-3.5 h-3.5" />
                     <span>Open in Letter Editor</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setShowVaultConfirm(false)}
-                    className="w-full py-2 rounded-xl border border-[#D2C3B0] bg-white text-xs font-bold text-[#5C4A3A] hover:bg-[#EFE9DE] transition-colors"
+                    className="w-full py-2 rounded-xl border border-[#D2C3B0] bg-white text-xs font-bold text-[#5C4A3A] hover:bg-[#EFE9DE] transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -708,74 +842,97 @@ export default function StoryViewerModal({
 
         {/* ─────────────────────────────────────────────────────────────
             BOTTOM INTERACTION BAR: 
-            - If Partner's Story: Emoji Reactions + Save to Vault
-            - If Own Story: Received Reactions + Save to Vault (No self-reacting!)
+            - Tier 1: 7 Emojis Grid (Full width, zero horizontal cropping)
+            - Tier 2: Seen Status (Left) + Save as Letter Button (Right)
            ───────────────────────────────────────────────────────────── */}
-        <div className="relative z-30 p-3 sm:p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent space-y-2">
+        <div className="relative z-30 px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-t from-black/95 via-black/75 to-transparent space-y-2.5">
           
-          <div className="flex items-center justify-between gap-2">
-            
-            {/* PARTNER'S STORY: Show Emoji Reactions Bar */}
-            {!isAuthor ? (
-              <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
-                {REACTION_EMOJIS.map((emoji) => {
-                  const count = currentStory.reactions?.[emoji]?.count || 0;
-                  return (
-                    <button
-                      key={emoji}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSendReaction(emoji);
-                      }}
-                      className="relative group bg-white/10 hover:bg-white/25 active:scale-125 border border-white/15 hover:border-[#D4AF37] px-2 sm:px-2.5 py-1.5 rounded-full transition-all flex items-center gap-1 shrink-0 shadow-xs"
-                      title={`Send ${emoji}`}
-                    >
-                      <span className="text-base sm:text-lg group-hover:scale-125 transition-transform">{emoji}</span>
-                      {count > 0 && (
-                        <span className="text-[10px] font-bold text-white font-mono">{count}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              /* OWN STORY: Show Seen Status & Received Reactions cleanly in footer */
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-white/90 py-0.5">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs ${
-                  isViewedByBoth || isViewedByPartner
-                    ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
-                    : 'bg-black/40 border-white/10 text-white/70'
-                }`}>
-                  <Eye className="w-3 h-3 text-[#D4AF37]" />
-                  <span>
-                    {isViewedByBoth
-                      ? `Seen by ${partnerName} 👀💕`
-                      : isViewedByPartner
-                        ? `Seen by ${partnerName}`
-                        : 'Seen only by you'}
-                  </span>
-                </span>
+          {/* Tier 1: Emoji Reactions Grid (Evenly distributed, zero horizontal scrolling or cropping) */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-center justify-items-center w-full">
+            {REACTION_EMOJIS.map((emoji) => {
+              const emojiData = currentStory.reactions?.[emoji];
+              const totalCount = emojiData?.count || 0;
+              const userCounts = emojiData?.userCounts || {};
+              let myCount = Number(userCounts[currentUserId]);
+              if (myCount === undefined || isNaN(myCount)) {
+                myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
+              }
+              const isMaxed = myCount >= 10;
+              const hasReacted = myCount > 0;
 
-                {receivedReactions.map(([emoji, r]) => (
-                  <span key={emoji} className="inline-flex items-center gap-1 text-xs bg-black/40 border border-white/10 px-2 py-0.5 rounded-full">
-                    <span>{emoji}</span>
-                    <span className="text-[10px] font-bold font-mono text-white">{r.count}</span>
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendReaction(emoji);
+                  }}
+                  disabled={isMaxed}
+                  className={`relative group w-full max-w-[44px] aspect-square rounded-2xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
+                    isMaxed 
+                      ? 'bg-white/5 border border-white/10 opacity-70 cursor-not-allowed' 
+                      : hasReacted
+                        ? 'bg-white/20 border border-[#D4AF37] shadow-sm hover:scale-110 active:scale-125'
+                        : 'bg-white/10 hover:bg-white/20 active:scale-125 border border-white/15 hover:border-white/40'
+                  }`}
+                  title={isMaxed ? `Reached max (10/10) reactions for ${emoji}` : `Send ${emoji} (${myCount}/10)`}
+                  aria-label={`React ${emoji}`}
+                >
+                  <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform select-none">
+                    {emoji}
                   </span>
-                ))}
-              </div>
-            )}
+                  
+                  {/* Reaction Count Badge */}
+                  {totalCount > 0 && (
+                    <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[17px] text-[10px] font-mono font-bold rounded-full shadow-md border text-center ${
+                      isMaxed 
+                        ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]' 
+                        : hasReacted
+                          ? 'bg-[#D4AF37] text-[#36271C] border-white/60'
+                          : 'bg-black/80 text-white border-white/30'
+                    }`}>
+                      {totalCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tier 2: Bottom Status & Actions (Seen by + Save as Letter) */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            
+            {/* Seen Status Badge */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs truncate ${
+                isViewedByBoth || isViewedByPartner
+                  ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                  : 'bg-black/50 border-white/15 text-white/75'
+              }`}>
+                <Eye className="w-3 h-3 text-[#D4AF37] shrink-0" />
+                <span className="truncate">
+                  {isViewedByBoth
+                    ? `Seen by ${partnerName} & You 💕`
+                    : isViewedByPartner
+                      ? `Seen by ${partnerName}`
+                      : 'Seen only by you'}
+                </span>
+              </span>
+            </div>
 
             {/* Save to Vault / Turn into Letter Button */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowVaultConfirm(true);
               }}
-              className="flex items-center gap-1.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/60 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95 whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/60 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
               title="Turn this photo snapshot into a sealed letter in your 2032 Vault"
             >
               <Mail className="w-3.5 h-3.5 text-[#F8E3B6]" />
-              <span className="font-bold">Save as Letter</span>
+              <span>Save as Letter</span>
             </button>
           </div>
 

@@ -257,16 +257,23 @@ export function subscribeToPairInfo(pairCode, callback) {
   }
 
   // Fallback local polling subscription
+  let lastJson = '';
   const pollInterval = setInterval(() => {
     const localPair = localStorage.getItem(LOCAL_PAIR_KEY);
-    if (localPair) {
-      const parsed = JSON.parse(localPair);
-      if (parsed.code === cleanCode) callback(parsed);
+    if (localPair && localPair !== lastJson) {
+      lastJson = localPair;
+      try {
+        const parsed = JSON.parse(localPair);
+        if (parsed.code === cleanCode) callback(parsed);
+      } catch (e) {}
     }
   }, 1000);
 
   getPairInfo(cleanCode).then(info => {
-    if (info) callback(info);
+    if (info) {
+      lastJson = JSON.stringify(info);
+      callback(info);
+    }
   });
 
   return () => clearInterval(pollInterval);
@@ -399,11 +406,18 @@ export function subscribeToLetters(pairId, currentUserId, callback) {
   }
 
   // Fallback local subscription
+  let lastJson = '';
   const pollInterval = setInterval(() => {
-    callback(getLocalLetters());
+    const raw = localStorage.getItem(LOCAL_LETTERS_KEY) || '[]';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      callback(getLocalLetters());
+    }
   }, 1000);
 
-  callback(getLocalLetters());
+  const initial = getLocalLetters();
+  lastJson = localStorage.getItem(LOCAL_LETTERS_KEY) || JSON.stringify(initial);
+  callback(initial);
   return () => clearInterval(pollInterval);
 }
 
@@ -470,14 +484,28 @@ export function subscribeToDailyMisses(pairCode, dateKey, callback) {
 
   // Local storage polling fallback
   const key = `misses_${cleanCode}_${dateKey}`;
+  let lastJson = '';
   const pollInterval = setInterval(() => {
     const raw = localStorage.getItem(key);
-    if (raw) callback(JSON.parse(raw));
+    if (raw && raw !== lastJson) {
+      lastJson = raw;
+      try {
+        callback(JSON.parse(raw));
+      } catch (e) {}
+    }
   }, 1000);
 
   const raw = localStorage.getItem(key);
-  if (raw) callback(JSON.parse(raw));
-  else callback({ dateKey, total: 0 });
+  if (raw) {
+    lastJson = raw;
+    try {
+      callback(JSON.parse(raw));
+    } catch (e) {
+      callback({ dateKey, total: 0 });
+    }
+  } else {
+    callback({ dateKey, total: 0 });
+  }
 
   return () => clearInterval(pollInterval);
 }
@@ -568,14 +596,20 @@ export function subscribeToStories(pairCode, callback) {
   }
 
   // Fallback local polling subscription
+  let lastJson = '';
   const pollInterval = setInterval(() => {
-    const list = getLocalStories().filter(s => (s.pairId || cleanCode).toUpperCase() === cleanCode);
-    list.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
-    callback(list);
+    const raw = localStorage.getItem(LOCAL_STORIES_KEY) || '[]';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      const list = getLocalStories().filter(s => (s.pairId || cleanCode).toUpperCase() === cleanCode);
+      list.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(list);
+    }
   }, 1000);
 
   const initialList = getLocalStories().filter(s => (s.pairId || cleanCode).toUpperCase() === cleanCode);
   initialList.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+  lastJson = localStorage.getItem(LOCAL_STORIES_KEY) || JSON.stringify(initialList);
   callback(initialList);
 
   return () => clearInterval(pollInterval);
@@ -593,7 +627,21 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
     if (snap.exists()) {
       const data = snap.data();
       const currentReactions = data.reactions || {};
-      const emojiData = currentReactions[emoji] || { count: 0, users: [] };
+      const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
+      
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      // Fallback: if userCounts wasn't initialized but user is in users list, initialize with count
+      if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
+        userCounts[userId] = emojiData.count;
+      }
+      const currentCountForUser = Number(userCounts[userId]) || 0;
+      
+      if (currentCountForUser >= 10) {
+        return currentReactions; // Max 10 reached for this user
+      }
+      
+      userCounts[userId] = currentCountForUser + 1;
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
       
       const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
       if (!newUsers.includes(userId)) {
@@ -603,7 +651,8 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
       const updatedReactions = {
         ...currentReactions,
         [emoji]: {
-          count: (emojiData.count || 0) + 1,
+          count: totalCount,
+          userCounts,
           users: newUsers,
           lastReactedBy: userName,
           lastReactedAt: timestamp
@@ -620,11 +669,26 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
   const story = localStories.find(s => s.id === storyId);
   if (story) {
     story.reactions = story.reactions || {};
-    const emojiData = story.reactions[emoji] || { count: 0, users: [] };
+    const emojiData = story.reactions[emoji] || { count: 0, userCounts: {}, users: [] };
+    const userCounts = { ...(emojiData.userCounts || {}) };
+    if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
+      userCounts[userId] = emojiData.count;
+    }
+    const currentCountForUser = Number(userCounts[userId]) || 0;
+    
+    if (currentCountForUser >= 10) {
+      return story.reactions;
+    }
+    
+    userCounts[userId] = currentCountForUser + 1;
+    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+    
     const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
     if (!newUsers.includes(userId)) newUsers.push(userId);
+    
     story.reactions[emoji] = {
-      count: (emojiData.count || 0) + 1,
+      count: totalCount,
+      userCounts,
       users: newUsers,
       lastReactedBy: userName,
       lastReactedAt: timestamp

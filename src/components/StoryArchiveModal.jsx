@@ -133,7 +133,7 @@ export default function StoryArchiveModal({
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">
           {filteredStories.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5">
-              {filteredStories.map((story) => {
+              {filteredStories.map((story, idx) => {
                 const totalReactions = Object.values(story.reactions || {}).reduce(
                   (sum, r) => sum + (r.count || 0), 
                   0
@@ -146,7 +146,7 @@ export default function StoryArchiveModal({
                 return (
                   <div
                     key={story.id}
-                    onClick={() => onSelectStory(story)}
+                    onClick={() => onSelectStory(story, filteredStories, idx)}
                     className="group relative rounded-2xl overflow-hidden border border-[#E2D7C7] hover:border-[#D4AF37] bg-[#FAF5EC] shadow-xs hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1 flex flex-col aspect-[3/4]"
                   >
                     {/* Media Thumbnail */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import MusicPlayer from './components/MusicPlayer';
 import VaultView from './components/VaultView';
@@ -157,8 +157,8 @@ export default function App() {
     setPairInfo(updated);
   };
 
-  // Story Handlers
-  const handleSaveStory = async (storyData) => {
+  // Story Handlers (Memoized to prevent unnecessary re-renders)
+  const handleSaveStory = useCallback(async (storyData) => {
     const saved = await saveStoryToCloud(storyData);
     setStories(prev => {
       const idx = prev.findIndex(s => s.id === saved.id);
@@ -169,19 +169,57 @@ export default function App() {
       }
       return [saved, ...prev];
     });
-  };
+  }, []);
 
-  const handleDeleteStory = async (storyId) => {
+  const handleDeleteStory = useCallback(async (storyId) => {
     await deleteStoryFromCloud(pairInfo?.code || '#JayFinallyGotAKiss', storyId);
     setStories(prev => prev.filter(s => s.id !== storyId));
     setViewerStories(prev => prev.filter(s => s.id !== storyId));
-  };
+  }, [pairInfo?.code]);
 
-  const handleReactToStory = async (storyId, emoji) => {
+  const handleReactToStory = useCallback(async (storyId, emoji) => {
+    if (!storyId) return;
+    const userId = user?.uid || 'demo-user-1';
+    const userName = user?.displayName || 'Partner';
+    const timestamp = new Date().toISOString();
+
+    const updateStoryReactions = (storyList) => storyList.map(s => {
+      if (s.id === storyId) {
+        const reactions = { ...(s.reactions || {}) };
+        const emojiData = reactions[emoji] || { count: 0, userCounts: {}, users: [] };
+        const userCounts = { ...(emojiData.userCounts || {}) };
+        if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
+          userCounts[userId] = emojiData.count;
+        }
+        const currentCount = Number(userCounts[userId]) || 0;
+
+        if (currentCount >= 10) return s; // Cap at 10
+
+        userCounts[userId] = currentCount + 1;
+        const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+        const users = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+        if (!users.includes(userId)) users.push(userId);
+
+        reactions[emoji] = {
+          count: totalCount,
+          userCounts,
+          users,
+          lastReactedBy: userName,
+          lastReactedAt: timestamp
+        };
+
+        return { ...s, reactions };
+      }
+      return s;
+    });
+
+    setStories(prev => updateStoryReactions(prev));
+    setViewerStories(prev => updateStoryReactions(prev));
+
     await reactToStory(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user, emoji);
-  };
+  }, [pairInfo?.code, user]);
 
-  const handleMarkStoryAsViewed = async (storyId) => {
+  const handleMarkStoryAsViewed = useCallback(async (storyId) => {
     if (!storyId || !user) return;
     const userId = user.uid || 'demo-user-1';
     setStories(prev => prev.map(s => {
@@ -194,9 +232,9 @@ export default function App() {
       return s;
     }));
     await markStoryAsViewed(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user);
-  };
+  }, [pairInfo?.code, user]);
 
-  const handleOpenStoryAsLetter = (story) => {
+  const handleOpenStoryAsLetter = useCallback((story) => {
     if (!story) return;
     setIsStoryViewerOpen(false);
     
@@ -221,24 +259,47 @@ export default function App() {
 
     setSelectedLetter(storyLetter);
     setIsEditorOpen(true);
-  };
+  }, [pairInfo?.code, user]);
 
-  const handleWithIntroCheck = (actionFn) => {
+  const handleWithIntroCheck = useCallback((actionFn) => {
     if (!hasSeenStoriesIntro) {
       setStoryIntroPendingAction(() => actionFn);
       setIsStoryIntroOpen(true);
     } else if (actionFn) {
       actionFn();
     }
-  };
+  }, [hasSeenStoriesIntro]);
 
-  const handleOpenStoryViewerWithStories = (storiesToView, startIndex = 0) => {
+  const handleOpenStoryViewerWithStories = useCallback((storiesToView, startIndex = 0) => {
     handleWithIntroCheck(() => {
       setViewerStories(storiesToView);
       setViewerInitialIndex(startIndex);
       setIsStoryViewerOpen(true);
     });
-  };
+  }, [handleWithIntroCheck]);
+
+  const handleCloseStoryViewer = useCallback(() => {
+    setIsStoryViewerOpen(false);
+  }, []);
+
+  // Sync viewerStories with latest live story metadata (reactions, views) without resetting viewer slide
+  useEffect(() => {
+    if (isStoryViewerOpen && viewerStories.length > 0) {
+      setViewerStories(prev => {
+        const idMap = new Map(stories.map(s => [s.id, s]));
+        let hasChanges = false;
+        const updated = prev.map(story => {
+          const fresh = idMap.get(story.id);
+          if (fresh && fresh !== story) {
+            hasChanges = true;
+            return fresh;
+          }
+          return story;
+        });
+        return hasChanges ? updated : prev;
+      });
+    }
+  }, [stories, isStoryViewerOpen, viewerStories.length]);
 
   const handleTimelineButtonClick = () => {
     if (!countdown.isUnlocked) {
@@ -457,7 +518,7 @@ export default function App() {
       {/* Story Viewer Modal */}
       <StoryViewerModal
         isOpen={isStoryViewerOpen}
-        onClose={() => setIsStoryViewerOpen(false)}
+        onClose={handleCloseStoryViewer}
         stories={viewerStories}
         initialStoryIndex={viewerInitialIndex}
         currentUser={user}
@@ -481,8 +542,10 @@ export default function App() {
         stories={stories}
         currentUser={user}
         pairInfo={pairInfo}
-        onSelectStory={(story) => {
-          handleOpenStoryViewerWithStories([story], 0);
+        onSelectStory={(story, archiveStories, index) => {
+          const list = archiveStories && archiveStories.length > 0 ? archiveStories : [story];
+          const startIndex = typeof index === 'number' && index >= 0 ? index : list.findIndex(s => s.id === story.id);
+          handleOpenStoryViewerWithStories(list, Math.max(0, startIndex));
         }}
         onOpenCreateStory={() => {
           setIsStoryArchiveOpen(false);
