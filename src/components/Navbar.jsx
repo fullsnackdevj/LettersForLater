@@ -63,6 +63,12 @@ export default function Navbar({
   const myActiveStories = activeStories.filter(s => s.authorId === currentUserId);
   const partnerActiveStories = activeStories.filter(s => s.authorId !== currentUserId);
 
+  // Get partner's photo from their stories, status, or pairInfo
+  const partnerPhoto = partnerActiveStories[0]?.authorPhoto 
+    || Object.values(statuses || {}).find(s => s.userId !== currentUserId)?.userPhoto
+    || pairInfo?.user2?.photo
+    || '';
+
   // Status notes
   const myStatus = statuses?.[currentUserId];
   const partnerStatus = Object.values(statuses || {}).find(s => s.userId !== currentUserId);
@@ -71,9 +77,14 @@ export default function Navbar({
   const myHasUnseen = myActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
   const partnerHasUnseen = partnerActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
 
-  // Check if my stories have been seen by partner
-  const mySeenByPartner = myActiveStories.length > 0 && myActiveStories.some(s => 
+  // Check if ALL my stories have been seen by partner (only then show the "seen" badge)
+  const mySeenByPartner = myActiveStories.length > 0 && myActiveStories.every(s => 
     (s.viewedBy || []).some(id => id !== currentUserId)
+  );
+
+  // Check if ANY of my stories have NOT been seen by partner yet (for glow ring)
+  const myHasUnseenByPartner = myActiveStories.length > 0 && myActiveStories.some(s => 
+    !(s.viewedBy || []).some(id => id !== currentUserId)
   );
 
   return (
@@ -120,8 +131,10 @@ export default function Navbar({
                 }}
                 className={`relative p-0.5 rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
                   myActiveStories.length > 0 
-                    ? 'border-2 border-[#D4AF37] p-[1px]'
-                    : 'border-2 border-dashed border-[#D4AF37]/70 p-[1px]'
+                    ? myHasUnseen
+                      ? 'story-ring-glow animate-story-pulse p-[2px]'
+                      : 'border-2 border-[#D2C3B0] p-[1px]'
+                    : 'border-2 border-dashed border-[#D2C3B0]/70 p-[1px]'
                 }`}
                 title={
                   myActiveStories.length > 0 
@@ -185,7 +198,7 @@ export default function Navbar({
                   partnerActiveStories.length > 0 
                     ? partnerHasUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D4AF37] p-[1px]'
+                      : 'border-2 border-[#D2C3B0] p-[1px]'
                     : 'border-2 border-dashed border-[#D2C3B0] opacity-85 p-[1px]'
                 }`}
                 title={
@@ -196,9 +209,17 @@ export default function Navbar({
                     : `${partnerName} has not posted a story today yet`
                 }
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-rose-100 border border-white flex items-center justify-center text-rose-800 font-bold text-xs">
-                  {partnerName.charAt(0)}
-                </div>
+                {partnerPhoto ? (
+                  <img
+                    src={partnerPhoto}
+                    alt={partnerName}
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white"
+                  />
+                ) : (
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-rose-100 border border-white flex items-center justify-center text-rose-800 font-bold text-xs">
+                    {partnerName.charAt(0)}
+                  </div>
+                )}
               </button>
 
               {/* Partner No Story Mini Popup / Tooltip */}

@@ -557,7 +557,7 @@ export async function saveStoryToCloud(story) {
     reactions: story.reactions || {},
     viewedBy: Array.isArray(story.viewedBy) && story.viewedBy.length > 0 
       ? story.viewedBy 
-      : [story.authorId || 'demo-user-1'],
+      : [],
     isArchivedToVault: Boolean(story.isArchivedToVault)
   };
 
