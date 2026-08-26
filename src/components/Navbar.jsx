@@ -129,12 +129,12 @@ export default function Navbar({
                     onOpenStoryCreator();
                   }
                 }}
-                className={`relative p-0.5 rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
+                className={`relative rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer p-[2px] ${
                   myActiveStories.length > 0 
                     ? myHasUnseen
-                      ? 'story-ring-glow animate-story-pulse p-[2px]'
-                      : 'border-2 border-[#D2C3B0] p-[1px]'
-                    : 'border-2 border-dashed border-[#D2C3B0]/70 p-[1px]'
+                      ? 'story-ring-glow animate-story-pulse'
+                      : 'border-2 border-[#D2C3B0]'
+                    : 'border-2 border-dashed border-[#D2C3B0]/70'
                 }`}
                 title={
                   myActiveStories.length > 0 
@@ -192,14 +192,14 @@ export default function Navbar({
                     setTimeout(() => setPartnerNoStoryToast(false), 3000);
                   }
                 }}
-                className={`relative p-0.5 rounded-full transition-transform ${
+                className={`relative rounded-full transition-transform ${
                   partnerActiveStories.length > 0 ? 'group-hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-pointer'
-                } flex items-center justify-center ${
+                } flex items-center justify-center p-[2px] ${
                   partnerActiveStories.length > 0 
                     ? partnerHasUnseen
-                      ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D2C3B0] p-[1px]'
-                    : 'border-2 border-dashed border-[#D2C3B0] opacity-85 p-[1px]'
+                      ? 'story-ring-glow animate-story-pulse' 
+                      : 'border-2 border-[#D2C3B0]'
+                    : 'border-2 border-dashed border-[#D2C3B0] opacity-85'
                 }`}
                 title={
                   partnerActiveStories.length > 0 
