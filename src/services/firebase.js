@@ -562,7 +562,7 @@ export async function saveStoryToCloud(story) {
   };
 
   if (isFirebaseConfigured && db) {
-    const docRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
+    const docRef = doc(db, 'pairs', cleanPairCode, 'stories', storyId);
     await setDoc(docRef, {
       ...storyDoc,
       serverTime: serverTimestamp()
