@@ -7,7 +7,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Sparkles
+  Sparkles,
+  Send
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { getCheersForStatus, CATEGORIZED_CHEERS } from '../data/statusPresets';
@@ -27,6 +28,7 @@ export default function StatusDetailModal({
 }) {
   const [floatingParticles, setFloatingParticles] = useState([]);
   const [sentCheer, setSentCheer] = useState(null);
+  const [customCheerText, setCustomCheerText] = useState('');
   const [isMoreCheersOpen, setIsMoreCheersOpen] = useState(false);
   const [activeCheerCategory, setActiveCheerCategory] = useState(0);
 
@@ -49,6 +51,7 @@ export default function StatusDetailModal({
     if (!isOpen) {
       setIsMoreCheersOpen(false);
       setSentCheer(null);
+      setCustomCheerText('');
     }
   }, [isOpen]);
 
@@ -79,9 +82,16 @@ export default function StatusDetailModal({
   // Get matching contextual cheers for the active status
   const contextualCheers = getCheersForStatus(targetStatus?.statusId, targetStatus?.statusText);
 
+  // Total reactions calculation
+  const totalPartnerReactions = Object.values(targetStatus.reactions || {}).reduce(
+    (sum, r) => sum + (Number(r?.count) || 0),
+    0
+  );
+
   // Handle reaction tap
   const handleReactionTap = (emoji) => {
-    if (!targetUserId || !onReactToStatus) return;
+    // Note creator should not be able to react to their own note
+    if (isMine || !targetUserId || !onReactToStatus) return;
 
     const emojiData = targetStatus.reactions?.[emoji];
     const userCounts = emojiData?.userCounts || {};
@@ -116,7 +126,7 @@ export default function StatusDetailModal({
   };
 
   const handleSendCheer = (cheerText) => {
-    if (!targetUserId) return;
+    if (isMine || !targetUserId) return;
     if (onSendCheer) {
       onSendCheer(targetUserId, cheerText);
     } else {
@@ -246,69 +256,134 @@ export default function StatusDetailModal({
 
           </div>
 
-          {/* Quick Reaction Bar (Both can react, max 10 taps) */}
-          <div className="px-5 py-3 border-t border-[#E2D7C7] bg-[#FAF5EC]/90 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-bold text-[#7A6855]">
-              <span>Quick Reactions</span>
-              <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
-            </div>
+          {/* Quick Reaction Bar (For Partner's Note only - Note Creator cannot react to themselves) */}
+          {!isMine ? (
+            <div className="px-5 py-3 border-t border-[#E2D7C7] bg-[#FAF5EC]/90 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#7A6855]">
+                <span>Quick Reactions</span>
+                <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
+              </div>
 
-            <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
-              {STATUS_REACTION_EMOJIS.map((emoji) => {
-                const emojiData = targetStatus.reactions?.[emoji];
-                const totalCount = emojiData?.count || 0;
-                const userCounts = emojiData?.userCounts || {};
-                let myCount = Number(userCounts[currentUserId]);
-                if (myCount === undefined || isNaN(myCount)) {
-                  myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-                }
-                const isMaxed = myCount >= 10;
-                const hasReacted = myCount > 0;
+              <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
+                {STATUS_REACTION_EMOJIS.map((emoji) => {
+                  const emojiData = targetStatus.reactions?.[emoji];
+                  const totalCount = emojiData?.count || 0;
+                  const userCounts = emojiData?.userCounts || {};
+                  let myCount = Number(userCounts[currentUserId]);
+                  if (myCount === undefined || isNaN(myCount)) {
+                    myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
+                  }
+                  const isMaxed = myCount >= 10;
+                  const hasReacted = myCount > 0;
 
-                return (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => handleReactionTap(emoji)}
-                    disabled={isMaxed}
-                    className={`relative group w-full aspect-square rounded-xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
-                      isMaxed
-                        ? 'bg-gray-100 border border-gray-300 opacity-60 cursor-not-allowed'
-                        : hasReacted
-                          ? 'bg-[#FAF5EC] border border-[#D4AF37] shadow-xs hover:scale-110 active:scale-125'
-                          : 'bg-white border border-[#E2D7C7] hover:border-[#D4AF37] active:scale-125 hover:bg-[#FAF5EC]'
-                    }`}
-                    title={`Send ${emoji} (${myCount}/10)`}
-                  >
-                    <span className="text-xl group-hover:scale-110 transition-transform select-none">
-                      {emoji}
-                    </span>
-
-                    {totalCount > 0 && (
-                      <span className={`absolute -top-1.5 -right-1 px-1 py-0.2 min-w-[14px] text-[9px] font-mono font-bold rounded-full shadow-xs border text-center ${
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleReactionTap(emoji)}
+                      disabled={isMaxed}
+                      className={`relative group w-full aspect-square rounded-xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
                         isMaxed
-                          ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]'
+                          ? 'bg-gray-100 border border-gray-300 opacity-60 cursor-not-allowed'
                           : hasReacted
-                            ? 'bg-[#D4AF37] text-[#36271C] border-white'
-                            : 'bg-[#36271C] text-white border-white'
-                      }`}>
-                        {totalCount}
+                            ? 'bg-[#FAF5EC] border border-[#D4AF37] shadow-xs hover:scale-110 active:scale-125'
+                            : 'bg-white border border-[#E2D7C7] hover:border-[#D4AF37] active:scale-125 hover:bg-[#FAF5EC]'
+                      }`}
+                      title={`Send ${emoji} (${myCount}/10)`}
+                    >
+                      <span className="text-xl group-hover:scale-110 transition-transform select-none">
+                        {emoji}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
+
+                      {totalCount > 0 && (
+                        <span className={`absolute -top-1.5 -right-1 px-1 py-0.2 min-w-[14px] text-[9px] font-mono font-bold rounded-full shadow-xs border text-center ${
+                          isMaxed
+                            ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]'
+                            : hasReacted
+                              ? 'bg-[#D4AF37] text-[#36271C] border-white'
+                              : 'bg-[#36271C] text-white border-white'
+                        }`}>
+                          {totalCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : totalPartnerReactions > 0 ? (
+            /* Read-only Received Reactions Summary for Creator */
+            <div className="px-5 py-3 border-t border-[#E2D7C7] bg-[#FAF5EC]/90 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#7A6855]">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                  <span>Reactions from {partnerName}</span>
+                </span>
+                <span className="text-[10px] text-[#9E8B75] font-normal">{totalPartnerReactions} total</span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-center pt-0.5">
+                {STATUS_REACTION_EMOJIS.map((emoji) => {
+                  const emojiData = targetStatus.reactions?.[emoji];
+                  const count = emojiData?.count || 0;
+                  if (count <= 0) return null;
+
+                  return (
+                    <span
+                      key={emoji}
+                      className="inline-flex items-center gap-1.5 bg-white border border-[#D4AF37]/60 px-3 py-1 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
+                    >
+                      <span className="text-base select-none">{emoji}</span>
+                      <span className="font-mono text-[11px] text-[#A83232] font-bold">×{count}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {/* Quick Cheering Replies (For Partner) or Edit Button (For Own Status) */}
-          <div className="p-4 border-t border-[#E2D7C7] bg-[#FAF5EC] space-y-2.5">
+          <div className="p-4 border-t border-[#E2D7C7] bg-[#FAF5EC] space-y-3">
             {!isMine ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2.5">
+                {/* Custom Message / Reply Input Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!customCheerText.trim()) return;
+                    handleSendCheer(customCheerText.trim());
+                    setCustomCheerText('');
+                  }}
+                  className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
+                >
+                  <input
+                    type="text"
+                    value={customCheerText}
+                    onChange={(e) => setCustomCheerText(e.target.value)}
+                    maxLength={100}
+                    placeholder={`Write a sweet reply to ${partnerName}...`}
+                    className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!customCheerText.trim()}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                      customCheerText.trim()
+                        ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
+                        : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
+                    }`}
+                    title="Send reply"
+                  >
+                    <span>Send</span>
+                    <Send className="w-3 h-3" />
+                  </button>
+                </form>
+
+                {/* Templated Cheers Divider & Trigger */}
+                <div className="flex items-center justify-between pt-0.5">
                   <p className="text-[11px] font-bold text-[#7A6855] text-left flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                    <span>Send a sweet cheer:</span>
+                    <span>Or send a quick cheer:</span>
                   </p>
                   <button
                     type="button"
@@ -320,7 +395,7 @@ export default function StatusDetailModal({
                   </button>
                 </div>
 
-                {/* Primary Contextual Auto-Populated Cheer Carousel (Option 2: Single Horizontal Row) */}
+                {/* Primary Contextual Auto-Populated Cheer Carousel */}
                 <div className="relative">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x touch-pan-x px-0.5">
                     {contextualCheers.map((cheer) => (
@@ -377,7 +452,7 @@ export default function StatusDetailModal({
                 {sentCheer && (
                   <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
                     <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="truncate">Cheer sent: "{sentCheer}"</span>
+                    <span className="truncate">Sent reply: "{sentCheer}"</span>
                   </div>
                 )}
               </div>

@@ -555,12 +555,14 @@ export async function saveStoryToCloud(story) {
     createdAtIso: story.createdAtIso || pht.isoString,
     expiresAtIso: story.expiresAtIso || expiresAt,
     reactions: story.reactions || {},
-    viewedBy: Array.isArray(story.viewedBy) ? story.viewedBy : [],
+    viewedBy: Array.isArray(story.viewedBy) && story.viewedBy.length > 0 
+      ? story.viewedBy 
+      : [story.authorId || 'demo-user-1'],
     isArchivedToVault: Boolean(story.isArchivedToVault)
   };
 
   if (isFirebaseConfigured && db) {
-    const docRef = doc(db, 'pairs', cleanPairCode, 'stories', storyId);
+    const docRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
     await setDoc(docRef, {
       ...storyDoc,
       serverTime: serverTimestamp()
@@ -626,6 +628,11 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
     const snap = await getDoc(storyRef);
     if (snap.exists()) {
       const data = snap.data();
+      // Guard: Author should not react to their own story
+      if (data.authorId === userId) {
+        return data.reactions || {};
+      }
+
       const currentReactions = data.reactions || {};
       const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
       
@@ -668,6 +675,11 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
   const localStories = getLocalStories();
   const story = localStories.find(s => s.id === storyId);
   if (story) {
+    // Guard: Author should not react to their own story
+    if (story.authorId === userId) {
+      return story.reactions || {};
+    }
+
     story.reactions = story.reactions || {};
     const emojiData = story.reactions[emoji] || { count: 0, userCounts: {}, users: [] };
     const userCounts = { ...(emojiData.userCounts || {}) };
@@ -775,6 +787,7 @@ export async function updateUserStatus(pairCode, user, statusData) {
   const userPhoto = user?.photoURL || '';
   const pht = getCurrentPHT();
 
+  // A newly created/updated status note starts with 0 old cheers, 0 old reactions, and only viewed by the author
   const statusDoc = {
     userId,
     userName,
@@ -787,15 +800,18 @@ export async function updateUserStatus(pairCode, user, statusData) {
     updatedAtPHT: pht.fullString,
     updatedAtIso: pht.isoString,
     reactions: {},
+    lastCheer: null,
+    cheers: [],
     viewedBy: [userId]
   };
 
   if (isFirebaseConfigured && db) {
     const statusRef = doc(db, 'pairs', cleanCode, 'statuses', userId);
+    // Overwrite without merge so old lastCheer/cheers/reactions/seenAt are cleanly cleared
     await setDoc(statusRef, {
       ...statusDoc,
       serverTime: serverTimestamp()
-    }, { merge: true });
+    });
     return statusDoc;
   }
 
@@ -844,6 +860,11 @@ export async function reactToStatus(pairCode, targetUserId, user, emoji) {
   const userId = user?.uid || 'demo-user-1';
   const userName = user?.displayName || 'Partner';
   const timestamp = new Date().toISOString();
+
+  // Guard: User cannot react to their own status note
+  if (targetUserId === userId) {
+    return {};
+  }
 
   if (isFirebaseConfigured && db) {
     const statusRef = doc(db, 'pairs', cleanCode, 'statuses', targetUserId);
@@ -913,6 +934,11 @@ export async function sendCheerToStatus(pairCode, targetUserId, user, cheerText)
   const userId = user?.uid || 'demo-user-1';
   const userName = user?.displayName || 'Partner';
   const timestamp = new Date().toISOString();
+
+  // Guard: User cannot cheer their own status note
+  if (targetUserId === userId) {
+    return null;
+  }
 
   const cheerObj = {
     text: cheerText,

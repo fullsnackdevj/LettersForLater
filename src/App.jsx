@@ -201,13 +201,19 @@ export default function App() {
   }, [pairInfo?.code]);
 
   const handleReactToStory = useCallback(async (storyId, emoji) => {
-    if (!storyId) return;
+    if (!storyId || !user) return;
     const userId = user?.uid || 'demo-user-1';
     const userName = user?.displayName || 'Partner';
     const timestamp = new Date().toISOString();
 
+    const targetStory = stories.find(s => s.id === storyId);
+    if (targetStory && targetStory.authorId === userId) {
+      return; // Author cannot react to own story
+    }
+
     const updateStoryReactions = (storyList) => storyList.map(s => {
       if (s.id === storyId) {
+        if (s.authorId === userId) return s;
         const reactions = { ...(s.reactions || {}) };
         const emojiData = reactions[emoji] || { count: 0, userCounts: {}, users: [] };
         const userCounts = { ...(emojiData.userCounts || {}) };
@@ -240,7 +246,7 @@ export default function App() {
     setViewerStories(prev => updateStoryReactions(prev));
 
     await reactToStory(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user, emoji);
-  }, [pairInfo?.code, user]);
+  }, [pairInfo?.code, user, stories]);
 
   const handleMarkStoryAsViewed = useCallback(async (storyId) => {
     if (!storyId || !user) return;
@@ -315,12 +321,18 @@ export default function App() {
       ...prev,
       [userId]: saved
     }));
-  }, [pairInfo?.code, user]);
+    if (selectedStatusForDetail?.userId === userId) {
+      setSelectedStatusForDetail(saved);
+    }
+  }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
 
   const handleReactToStatus = useCallback(async (targetUserId, emoji) => {
     if (!targetUserId || !user) return;
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const currentUserId = user.uid || 'demo-user-1';
+    // User cannot react to their own status note
+    if (targetUserId === currentUserId) return;
+
     const currentUserName = user.displayName || 'Partner';
     const timestamp = new Date().toISOString();
 
@@ -369,6 +381,9 @@ export default function App() {
     if (!targetUserId || !user || !cheerText) return;
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const currentUserId = user.uid || 'demo-user-1';
+    // User cannot cheer their own status note
+    if (targetUserId === currentUserId) return;
+
     const currentUserName = user.displayName || 'Partner';
     const timestamp = new Date().toISOString();
 

@@ -322,9 +322,9 @@ export default function StoryViewerModal({
     touchStartRef.current = null;
   };
 
-  // Trigger floating emoji reaction (Both users can react, max 10 per emoji per user)
+  // Trigger floating emoji reaction (Partner can react, max 10 per emoji per user, author cannot react to own story)
   const handleSendReaction = (emoji) => {
-    if (!currentStory) return;
+    if (isAuthor || !currentStory) return;
 
     const emojiData = currentStory.reactions?.[emoji];
     const userCounts = emojiData?.userCounts || {};
@@ -446,13 +446,16 @@ export default function StoryViewerModal({
     return 'Aug 24, 2026 PHT';
   };
 
-  // Seen Status calculations
+  // Seen Status & Reaction calculations
   const myName = getNickname(currentUser?.displayName) || 'You';
   const user2Name = getNickname(pairInfo?.user2?.name) || 'Partner';
   const partnerName = myName === user2Name ? 'Jay' : user2Name;
   const viewedList = currentStory.viewedBy || [];
   const isViewedByPartner = viewedList.some(id => id !== currentStory.authorId);
-  const isViewedByBoth = viewedList.length >= 2;
+  const totalPartnerReactions = Object.values(currentStory.reactions || {}).reduce(
+    (sum, r) => sum + (Number(r?.count) || 0),
+    0
+  );
 
 
   return (
@@ -847,58 +850,90 @@ export default function StoryViewerModal({
            ───────────────────────────────────────────────────────────── */}
         <div className="relative z-30 px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-t from-black/95 via-black/75 to-transparent space-y-2.5">
           
-          {/* Tier 1: Emoji Reactions Grid (Evenly distributed, zero horizontal scrolling or cropping) */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-center justify-items-center w-full">
-            {REACTION_EMOJIS.map((emoji) => {
-              const emojiData = currentStory.reactions?.[emoji];
-              const totalCount = emojiData?.count || 0;
-              const userCounts = emojiData?.userCounts || {};
-              let myCount = Number(userCounts[currentUserId]);
-              if (myCount === undefined || isNaN(myCount)) {
-                myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-              }
-              const isMaxed = myCount >= 10;
-              const hasReacted = myCount > 0;
+          {/* Tier 1: Emoji Reactions Grid (For Partner only - Author views read-only reactions) */}
+          {!isAuthor ? (
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-center justify-items-center w-full">
+              {REACTION_EMOJIS.map((emoji) => {
+                const emojiData = currentStory.reactions?.[emoji];
+                const totalCount = emojiData?.count || 0;
+                const userCounts = emojiData?.userCounts || {};
+                let myCount = Number(userCounts[currentUserId]);
+                if (myCount === undefined || isNaN(myCount)) {
+                  myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
+                }
+                const isMaxed = myCount >= 10;
+                const hasReacted = myCount > 0;
 
-              return (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSendReaction(emoji);
-                  }}
-                  disabled={isMaxed}
-                  className={`relative group w-full max-w-[44px] aspect-square rounded-2xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
-                    isMaxed 
-                      ? 'bg-white/5 border border-white/10 opacity-70 cursor-not-allowed' 
-                      : hasReacted
-                        ? 'bg-white/20 border border-[#D4AF37] shadow-sm hover:scale-110 active:scale-125'
-                        : 'bg-white/10 hover:bg-white/20 active:scale-125 border border-white/15 hover:border-white/40'
-                  }`}
-                  title={isMaxed ? `Reached max (10/10) reactions for ${emoji}` : `Send ${emoji} (${myCount}/10)`}
-                  aria-label={`React ${emoji}`}
-                >
-                  <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform select-none">
-                    {emoji}
-                  </span>
-                  
-                  {/* Reaction Count Badge */}
-                  {totalCount > 0 && (
-                    <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[17px] text-[10px] font-mono font-bold rounded-full shadow-md border text-center ${
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSendReaction(emoji);
+                    }}
+                    disabled={isMaxed}
+                    className={`relative group w-full max-w-[44px] aspect-square rounded-2xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
                       isMaxed 
-                        ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]' 
+                        ? 'bg-white/5 border border-white/10 opacity-70 cursor-not-allowed' 
                         : hasReacted
-                          ? 'bg-[#D4AF37] text-[#36271C] border-white/60'
-                          : 'bg-black/80 text-white border-white/30'
-                    }`}>
-                      {totalCount}
+                          ? 'bg-white/20 border border-[#D4AF37] shadow-sm hover:scale-110 active:scale-125'
+                          : 'bg-white/10 hover:bg-white/20 active:scale-125 border border-white/15 hover:border-white/40'
+                    }`}
+                    title={isMaxed ? `Reached max (10/10) reactions for ${emoji}` : `Send ${emoji} (${myCount}/10)`}
+                    aria-label={`React ${emoji}`}
+                  >
+                    <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform select-none">
+                      {emoji}
                     </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                    
+                    {/* Reaction Count Badge */}
+                    {totalCount > 0 && (
+                      <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[17px] text-[10px] font-mono font-bold rounded-full shadow-md border text-center ${
+                        isMaxed 
+                          ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]' 
+                          : hasReacted
+                            ? 'bg-[#D4AF37] text-[#36271C] border-white/60'
+                            : 'bg-black/80 text-white border-white/30'
+                      }`}>
+                        {totalCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : totalPartnerReactions > 0 ? (
+            /* Read-only Received Reactions Summary for Author */
+            <div className="flex items-center justify-between px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15">
+              <div className="flex items-center gap-1.5 text-xs text-white/90">
+                <span className="text-[#F8E3B6] font-bold">Reactions from {partnerName}:</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {REACTION_EMOJIS.map((emoji) => {
+                  const emojiData = currentStory.reactions?.[emoji];
+                  const count = emojiData?.count || 0;
+                  if (count <= 0) return null;
+                  return (
+                    <span
+                      key={emoji}
+                      className="inline-flex items-center gap-1 bg-black/50 border border-[#D4AF37]/60 px-2.5 py-0.5 rounded-full text-xs text-white shadow-xs"
+                    >
+                      <span>{emoji}</span>
+                      <span className="font-mono text-[11px] text-[#F8E3B6] font-bold">×{count}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Note for Author when no reactions yet */
+            <div className="flex items-center justify-center py-1 text-center">
+              <span className="text-[11px] text-white/70 font-medium tracking-wide">
+                Your story snapshot is live • Visible to {partnerName} 💕
+              </span>
+            </div>
+          )}
 
           {/* Tier 2: Bottom Status & Actions (Seen by + Save as Letter) */}
           <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -906,17 +941,19 @@ export default function StoryViewerModal({
             {/* Seen Status Badge */}
             <div className="flex items-center gap-1.5 min-w-0">
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs truncate ${
-                isViewedByBoth || isViewedByPartner
-                  ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
-                  : 'bg-black/50 border-white/15 text-white/75'
+                isAuthor
+                  ? isViewedByPartner
+                    ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                    : 'bg-black/50 border-white/15 text-white/75'
+                  : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
               }`}>
                 <Eye className="w-3 h-3 text-[#D4AF37] shrink-0" />
                 <span className="truncate">
-                  {isViewedByBoth
-                    ? `Seen by ${partnerName} & You 💕`
-                    : isViewedByPartner
-                      ? `Seen by ${partnerName}`
-                      : 'Seen only by you'}
+                  {isAuthor
+                    ? isViewedByPartner
+                      ? `Seen by ${partnerName} 💕`
+                      : `Not seen by ${partnerName} yet`
+                    : `Seen by you 👀`}
                 </span>
               </span>
             </div>

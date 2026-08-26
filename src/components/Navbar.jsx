@@ -120,18 +120,14 @@ export default function Navbar({
                 }}
                 className={`relative p-0.5 rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
                   myActiveStories.length > 0 
-                    ? myHasUnseen
-                      ? 'story-ring-glow animate-story-pulse p-[2px]' 
-                      : 'border-2 border-[#D4AF37] p-[1px]'
+                    ? 'border-2 border-[#D4AF37] p-[1px]'
                     : 'border-2 border-dashed border-[#D4AF37]/70 p-[1px]'
                 }`}
                 title={
                   myActiveStories.length > 0 
-                    ? myHasUnseen
-                      ? `✨ You have new unviewed stories (${myActiveStories.length})`
-                      : mySeenByPartner
-                        ? `Your stories (${myActiveStories.length}) • Seen by ${partnerName} 💕`
-                        : `Your stories (${myActiveStories.length} active) • Tap '+' to add another`
+                    ? mySeenByPartner
+                      ? `Your stories (${myActiveStories.length}) • Seen by ${partnerName} 💕`
+                      : `Your stories (${myActiveStories.length} active) • Tap '+' to add another`
                     : `Post a story for today`
                 }
               >
@@ -143,7 +139,7 @@ export default function Navbar({
               </button>
 
               {/* Partner Seen Green Eye Badge for Your Story */}
-              {mySeenByPartner && !myHasUnseen && (
+              {mySeenByPartner && (
                 <span 
                   className="absolute -top-1 -right-1 bg-emerald-700 text-white rounded-full p-0.5 border border-white shadow-xs z-30 pointer-events-none" 
                   title={`Seen by ${partnerName} 💕`}
