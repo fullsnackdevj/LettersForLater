@@ -17,7 +17,7 @@ import {
   increment,
   runTransaction
 } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
 
 // Firebase configuration (Loaded from import.meta.env or fallback)
@@ -320,6 +320,40 @@ export async function saveLetterToCloud(letter) {
     }
   }
 
+  // Upload audioNote if present
+  let processedAudioNote = null;
+  if (letter.audioNote) {
+    if (letter.audioNote.storageUrl) {
+      processedAudioNote = {
+        storageUrl: letter.audioNote.storageUrl,
+        durationSec: letter.audioNote.durationSec || 0,
+        sizeKb: letter.audioNote.sizeKb || 0
+      };
+    } else if (letter.audioNote.audioBlob) {
+      try {
+        const audioUrl = await uploadAudioToStorage(letter.audioNote.audioBlob, pairId, letterId);
+        processedAudioNote = {
+          storageUrl: audioUrl,
+          durationSec: letter.audioNote.durationSec || 0,
+          sizeKb: letter.audioNote.sizeKb || 0
+        };
+      } catch (err) {
+        console.error('Error uploading audio note:', err);
+        processedAudioNote = {
+          storageUrl: letter.audioNote.dataUrl || '',
+          durationSec: letter.audioNote.durationSec || 0,
+          sizeKb: letter.audioNote.sizeKb || 0
+        };
+      }
+    } else if (letter.audioNote.dataUrl) {
+      processedAudioNote = {
+        storageUrl: letter.audioNote.dataUrl,
+        durationSec: letter.audioNote.durationSec || 0,
+        sizeKb: letter.audioNote.sizeKb || 0
+      };
+    }
+  }
+
   const letterDoc = {
     pairId: letter.pairId || '#JayFinallyGotAKiss',
     authorId: letter.authorId,
@@ -337,6 +371,7 @@ export async function saveLetterToCloud(letter) {
       width: img.width || 0,
       height: img.height || 0
     })),
+    audioNote: processedAudioNote,
     isDraft: Boolean(letter.isDraft),
     // IMMUTABLE PHT Creation Timestamp (Strictly preserved from original draft moment)
     createdAtPHT: preservedCreatedAtPHT || pht.fullString,
@@ -1064,6 +1099,336 @@ export async function markStatusAsViewed(pairCode, targetUserId, user) {
       saveLocalStatuses(local);
     }
   }
+}
+/**
+ * Audio Upload Helper (Voice Notes)
+ */
+export async function uploadAudioToStorage(audioBlob, pairId, noteId) {
+  const cleanCode = (pairId || '#JayFinallyGotAKiss').toUpperCase();
+  if (!isFirebaseConfigured || !storage || !audioBlob) {
+    // Local fallback: convert blob to data URL
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(audioBlob);
+    });
+  }
+
+  const ext = audioBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+  const fileName = `voice_${noteId}_${Date.now()}.${ext}`;
+  const storageRef = ref(storage, `letters/${cleanCode}/audio/${fileName}`);
+  await uploadBytes(storageRef, audioBlob, { contentType: audioBlob.type });
+  return await getDownloadURL(storageRef);
+}
+
+/**
+ * Couple Bucket List Services
+ */
+const LOCAL_BUCKET_KEY = 'lfl_bucket_list';
+
+function getLocalBucketList() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_BUCKET_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalBucketList(list) {
+  localStorage.setItem(LOCAL_BUCKET_KEY, JSON.stringify(list));
+}
+
+export async function saveBucketItem(pairCode, item, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+  const isNew = !item.id;
+  const itemId = item.id || `bucket-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  // Upload completion photo if present as dataUrl
+  let completionPhotoUrl = item.completionPhoto || '';
+  if (item.completionPhotoDataUrl && isFirebaseConfigured && storage) {
+    try {
+      const fileName = `bucket_${itemId}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `letters/${cleanCode}/bucket/${fileName}`);
+      await uploadString(storageRef, item.completionPhotoDataUrl, 'data_url');
+      completionPhotoUrl = await getDownloadURL(storageRef);
+    } catch (err) {
+      console.error('Error uploading bucket photo:', err);
+      completionPhotoUrl = item.completionPhotoDataUrl;
+    }
+  } else if (item.completionPhotoDataUrl) {
+    completionPhotoUrl = item.completionPhotoDataUrl;
+  }
+
+  const itemDoc = {
+    title: item.title || '',
+    description: item.description || '',
+    category: item.category || 'general',
+    targetSeason: item.targetSeason || '',
+    createdBy: item.createdBy || user?.uid || 'demo-user-1',
+    createdByName: item.createdByName || user?.displayName || 'Jay',
+    createdAtPHT: item.createdAtPHT || pht.fullString,
+    createdAtIso: item.createdAtIso || pht.isoString,
+    isCompleted: Boolean(item.isCompleted),
+    isArchived: Boolean(item.isArchived),
+    completedAtPHT: item.completedAtPHT || '',
+    completedAtIso: item.completedAtIso || '',
+    completedBy: item.completedBy || '',
+    completedByName: item.completedByName || '',
+    completionNote: item.completionNote || '',
+    completionPhoto: completionPhotoUrl,
+    pairId: cleanCode
+  };
+
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanCode, 'bucketList', itemId);
+    await setDoc(docRef, { ...itemDoc, serverTime: serverTimestamp() }, { merge: true });
+    return { id: itemId, ...itemDoc };
+  }
+
+  // Local fallback
+  const localList = getLocalBucketList();
+  const newItem = { id: itemId, ...itemDoc };
+  const idx = localList.findIndex(i => i.id === itemId);
+  if (idx >= 0) {
+    localList[idx] = newItem;
+  } else {
+    localList.unshift(newItem);
+  }
+  saveLocalBucketList(localList);
+  return newItem;
+}
+
+export async function markBucketItemCompleted(pairCode, itemId, completionData, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+
+  // Upload completion photo if present
+  let completionPhotoUrl = '';
+  if (completionData.completionPhotoDataUrl) {
+    if (isFirebaseConfigured && storage) {
+      try {
+        const fileName = `bucket_${itemId}_done_${Date.now()}.jpg`;
+        const storageRef = ref(storage, `letters/${cleanCode}/bucket/${fileName}`);
+        await uploadString(storageRef, completionData.completionPhotoDataUrl, 'data_url');
+        completionPhotoUrl = await getDownloadURL(storageRef);
+      } catch (err) {
+        console.error('Error uploading bucket completion photo:', err);
+        completionPhotoUrl = completionData.completionPhotoDataUrl;
+      }
+    } else {
+      completionPhotoUrl = completionData.completionPhotoDataUrl;
+    }
+  }
+
+  const updates = {
+    isCompleted: true,
+    completedAtPHT: pht.fullString,
+    completedAtIso: pht.isoString,
+    completedBy: user?.uid || 'demo-user-1',
+    completedByName: user?.displayName || 'Jay',
+    completionNote: completionData.completionNote || '',
+    completionPhoto: completionPhotoUrl
+  };
+
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanCode, 'bucketList', itemId);
+    await updateDoc(docRef, updates);
+    return updates;
+  }
+
+  // Local fallback
+  const localList = getLocalBucketList();
+  const idx = localList.findIndex(i => i.id === itemId);
+  if (idx >= 0) {
+    localList[idx] = { ...localList[idx], ...updates };
+    saveLocalBucketList(localList);
+  }
+  return updates;
+}
+
+export async function deleteBucketItem(pairCode, itemId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+
+  if (isFirebaseConfigured && db) {
+    await deleteDoc(doc(db, 'pairs', cleanCode, 'bucketList', itemId));
+  }
+
+  const localList = getLocalBucketList().filter(i => i.id !== itemId);
+  saveLocalBucketList(localList);
+}
+
+export function subscribeToBucketList(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const col = collection(db, 'pairs', cleanCode, 'bucketList');
+    return onSnapshot(col, (snapshot) => {
+      const items = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      items.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(items);
+    });
+  }
+
+  // Local fallback polling
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_BUCKET_KEY) || '[]';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      const list = getLocalBucketList().filter(i => (i.pairId || cleanCode).toUpperCase() === cleanCode);
+      list.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(list);
+    }
+  }, 1000);
+
+  const initial = getLocalBucketList().filter(i => (i.pairId || cleanCode).toUpperCase() === cleanCode);
+  initial.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+  lastJson = localStorage.getItem(LOCAL_BUCKET_KEY) || JSON.stringify(initial);
+  callback(initial);
+
+  return () => clearInterval(pollInterval);
+}
+
+/**
+ * =========================================================================
+ * Prayer Requests Services (Simple Add, Pray Reaction & 24hr Auto-Archive)
+ * =========================================================================
+ */
+const LOCAL_PRAYER_REQUESTS_KEY = 'lfl_local_prayer_requests_v2';
+
+export function getLocalPrayerRequests() {
+  try {
+    const raw = localStorage.getItem(LOCAL_PRAYER_REQUESTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveLocalPrayerRequests(list) {
+  try {
+    localStorage.setItem(LOCAL_PRAYER_REQUESTS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+export async function savePrayerRequest(pairCode, requestData, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+  const authorId = user?.uid || 'demo-user-1';
+  const authorName = user?.displayName || 'Jay';
+  const requestId = requestData.id || `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  const requestDoc = {
+    pairId: cleanCode,
+    text: requestData.text || '',
+    createdBy: requestData.createdBy || authorId,
+    createdByName: requestData.createdByName || authorName,
+    createdAtPHT: requestData.createdAtPHT || pht.fullString,
+    createdAtIso: requestData.createdAtIso || pht.isoString,
+    prayedBy: requestData.prayedBy || null,
+    prayedByName: requestData.prayedByName || null,
+    prayedAtPHT: requestData.prayedAtPHT || null,
+    prayedAtIso: requestData.prayedAtIso || null,
+    isArchived: Boolean(requestData.isArchived)
+  };
+
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanCode, 'prayerRequests', requestId);
+    await setDoc(docRef, { ...requestDoc, serverTime: serverTimestamp() }, { merge: true });
+    return { id: requestId, ...requestDoc };
+  }
+
+  // Local fallback
+  const list = getLocalPrayerRequests();
+  const newReq = { id: requestId, ...requestDoc };
+  const idx = list.findIndex(r => r.id === requestId);
+  if (idx >= 0) {
+    list[idx] = newReq;
+  } else {
+    list.unshift(newReq);
+  }
+  saveLocalPrayerRequests(list);
+  return newReq;
+}
+
+export async function markPrayerAsPrayed(pairCode, requestId, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+  const currentUserId = user?.uid || 'demo-user-1';
+  const currentUserName = user?.displayName || 'Jay';
+
+  const updateData = {
+    prayedBy: currentUserId,
+    prayedByName: currentUserName,
+    prayedAtPHT: pht.fullString,
+    prayedAtIso: pht.isoString
+  };
+
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanCode, 'prayerRequests', requestId);
+    await updateDoc(docRef, updateData);
+    return updateData;
+  }
+
+  // Local fallback
+  const list = getLocalPrayerRequests();
+  const idx = list.findIndex(r => r.id === requestId);
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...updateData };
+    saveLocalPrayerRequests(list);
+  }
+  return updateData;
+}
+
+export async function deletePrayerRequest(pairCode, requestId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const docRef = doc(db, 'pairs', cleanCode, 'prayerRequests', requestId);
+    await deleteDoc(docRef);
+    return true;
+  }
+
+  const list = getLocalPrayerRequests();
+  const filtered = list.filter(r => r.id !== requestId);
+  saveLocalPrayerRequests(filtered);
+  return true;
+}
+
+export function subscribeToPrayerRequests(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const col = collection(db, 'pairs', cleanCode, 'prayerRequests');
+    return onSnapshot(col, (snapshot) => {
+      const items = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      items.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(items);
+    });
+  }
+
+  // Local fallback polling
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_PRAYER_REQUESTS_KEY) || '[]';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      const list = getLocalPrayerRequests().filter(p => (p.pairId || cleanCode).toUpperCase() === cleanCode);
+      list.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+      callback(list);
+    }
+  }, 1000);
+
+  const initial = getLocalPrayerRequests().filter(p => (p.pairId || cleanCode).toUpperCase() === cleanCode);
+  initial.sort((a, b) => new Date(b.createdAtIso || 0).getTime() - new Date(a.createdAtIso || 0).getTime());
+  lastJson = localStorage.getItem(LOCAL_PRAYER_REQUESTS_KEY) || JSON.stringify(initial);
+  callback(initial);
+
+  return () => clearInterval(pollInterval);
 }
 
 

@@ -18,6 +18,8 @@ import StoryIntroModal from './components/StoryIntroModal';
 import StatusPickerModal from './components/StatusPickerModal';
 import StatusDetailModal from './components/StatusDetailModal';
 import CoupleStatusBanner from './components/CoupleStatusBanner';
+import BucketListModal from './components/BucketListModal';
+import DailyPrayerModal from './components/DailyPrayerModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -39,7 +41,15 @@ import {
   subscribeToStatuses,
   reactToStatus,
   sendCheerToStatus,
-  markStatusAsViewed
+  markStatusAsViewed,
+  saveBucketItem,
+  markBucketItemCompleted,
+  deleteBucketItem,
+  subscribeToBucketList,
+  savePrayerRequest,
+  markPrayerAsPrayed,
+  deletePrayerRequest,
+  subscribeToPrayerRequests
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -53,11 +63,12 @@ export default function App() {
   });
   const [letters, setLetters] = useState([]);
   const [stories, setStories] = useState([]);
+  const [bucketItems, setBucketItems] = useState([]);
 
   // App Startup Gatekeeper Lock State
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
 
-  // Active View Tab: 'vault' | 'timeline'
+  // Active View Tab: 'vault' | 'timeline' | 'bucketlist'
   const [activeTab, setActiveTab] = useState('vault');
 
   // Modal States - Prioritize Google Auth Modal on app open if not signed in
@@ -90,20 +101,51 @@ export default function App() {
   const [isStatusDetailOpen, setIsStatusDetailOpen] = useState(false);
   const [selectedStatusForDetail, setSelectedStatusForDetail] = useState(null);
 
+  // Fantasy / Bucket List Modal
+  const [isBucketListOpen, setIsBucketListOpen] = useState(false);
+
+  // Daily Prayers Modal ("Our Daily Prayers")
+  const [prayers, setPrayers] = useState([]);
+  const [isPrayersOpen, setIsPrayersOpen] = useState(false);
+
   const [selectedLetter, setSelectedLetter] = useState(null);
 
   // Subscribe to Auth State & auto-manage Auth Modal
   useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
     const unsubscribe = subscribeToAuth((usr) => {
       setUser(usr);
       if (!usr) {
         setIsAuthOpen(true);
       } else {
         setIsAuthOpen(false);
+        // Force scroll to top on login
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        setTimeout(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }, 50);
       }
     });
     return () => unsubscribe();
   }, []);
+
+  // Force scroll to top when app unlocks
+  useEffect(() => {
+    if (isAppUnlocked) {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      const timer = setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isAppUnlocked]);
 
   // Fetch / Subscribe to Realtime Pair Info
   useEffect(() => {
@@ -139,6 +181,24 @@ export default function App() {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const unsubscribe = subscribeToStatuses(pairCode, (fetchedStatuses) => {
       setStatuses(fetchedStatuses || {});
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Couple Bucket List ("Our Shared Adventures")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToBucketList(pairCode, (fetchedItems) => {
+      setBucketItems(fetchedItems || []);
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Couple Prayer Requests ("Prayer Requests")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToPrayerRequests(pairCode, (fetchedPrayers) => {
+      setPrayers(fetchedPrayers || []);
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
@@ -465,6 +525,88 @@ export default function App() {
     }
   }, [stories, isStoryViewerOpen, viewerStories.length]);
 
+  // Bucket List Handlers
+  const handleSaveBucketItem = useCallback(async (itemData) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUser = user || { uid: 'demo-user-1', displayName: 'Jay' };
+    const saved = await saveBucketItem(pairCode, itemData, currentUser);
+    if (saved) {
+      setBucketItems(prev => {
+        const idx = prev.findIndex(i => i.id === saved.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved;
+          return copy;
+        }
+        return [saved, ...prev];
+      });
+    }
+  }, [pairInfo?.code, user]);
+
+  const handleCompleteBucketItem = useCallback(async (itemId, completionData) => {
+    if (!user || !itemId) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await markBucketItemCompleted(pairCode, itemId, completionData, user);
+    setBucketItems(prev => prev.map(i => {
+      if (i.id === itemId) {
+        return {
+          ...i,
+          isCompleted: true,
+          completionNote: completionData.completionNote,
+          completionPhoto: completionData.completionPhotoDataUrl || i.completionPhoto
+        };
+      }
+      return i;
+    }));
+  }, [pairInfo?.code, user]);
+
+  const handleDeleteBucketItem = useCallback(async (itemId) => {
+    if (!itemId) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await deleteBucketItem(pairCode, itemId);
+    setBucketItems(prev => prev.filter(i => i.id !== itemId));
+  }, [pairInfo?.code]);
+
+  // Prayer Requests Handlers
+  const handleSavePrayerRequest = useCallback(async (prayerData) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUser = user || { uid: 'demo-user-1', displayName: 'Jay' };
+    const saved = await savePrayerRequest(pairCode, prayerData, currentUser);
+    if (saved) {
+      setPrayers(prev => {
+        const idx = prev.findIndex(p => p.id === saved.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved;
+          return copy;
+        }
+        return [saved, ...prev];
+      });
+    }
+  }, [pairInfo?.code, user]);
+
+  const handleMarkPrayerAsPrayed = useCallback(async (requestId) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUser = user || { uid: 'demo-user-1', displayName: 'Jay' };
+    const updateData = await markPrayerAsPrayed(pairCode, requestId, currentUser);
+    setPrayers(prev => prev.map(p => {
+      if (p.id === requestId) {
+        return {
+          ...p,
+          ...updateData
+        };
+      }
+      return p;
+    }));
+  }, [pairInfo?.code, user]);
+
+  const handleDeletePrayerRequest = useCallback(async (requestId) => {
+    if (!requestId) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await deletePrayerRequest(pairCode, requestId);
+    setPrayers(prev => prev.filter(p => p.id !== requestId));
+  }, [pairInfo?.code]);
+
   const handleTimelineButtonClick = () => {
     if (!countdown.isUnlocked) {
       return; // Disabled before 2032
@@ -504,6 +646,7 @@ export default function App() {
         }}
         onOpenStoryArchive={() => setIsStoryArchiveOpen(true)}
         onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
+        onOpenBucketList={() => setIsBucketListOpen(true)}
       />
 
       {/* Couple Live Status Ribbon ("What We're Currently Doing") */}
@@ -520,58 +663,24 @@ export default function App() {
         />
       )}
 
-      {/* View Switcher Bar (Vault vs Timeline) */}
-      <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-3 py-2 flex flex-wrap justify-center gap-2 max-w-full overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('vault')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-            activeTab === 'vault'
-              ? 'bg-[#A83232] text-[#F8E3B6] shadow-sm'
-              : 'text-[#4A3B2C] hover:bg-[#EFE9DE]'
-          }`}
-        >
-          <Lock className="w-3.5 h-3.5" />
-          <span>Time Capsule Vault</span>
-        </button>
-
-        <button
-          onClick={handleTimelineButtonClick}
-          disabled={!countdown.isUnlocked}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-            activeTab === 'timeline'
-              ? 'bg-[#D4AF37] text-[#3D2600] shadow-sm'
-              : !countdown.isUnlocked 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-70'
-                : 'text-[#4A3B2C] hover:bg-[#EFE9DE]'
-          }`}
-        >
-          {!countdown.isUnlocked ? (
-            <>
-              <Lock className="w-3.5 h-3.5" />
-              <span>Locked Until The Right Time</span>
-            </>
-          ) : isLettersUnlocked ? (
-            <>
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Unlocked Timeline</span>
-            </>
-          ) : (
-            <>
-              <Key className="w-3.5 h-3.5" />
-              <span>Reveal All The Letters</span>
-            </>
-          )}
-        </button>
-      </div>
-
-
-      {/* Main Content View */}
+      {/* Main Content View (Time Capsule Vault by default, or Unlocked Timeline in 2032) */}
       <main className="flex-1">
-        {activeTab === 'vault' ? (
+        {activeTab === 'timeline' ? (
+          <TimelineView
+            letters={letters}
+            currentUser={user}
+            onViewLetter={(letter) => {
+              setSelectedLetter(letter);
+              setIsDetailOpen(true);
+            }}
+          />
+        ) : (
           <VaultView
             letters={letters}
             currentUser={user}
             pairInfo={pairInfo}
+            isLettersUnlocked={isLettersUnlocked}
+            bucketItems={bucketItems}
             onWriteNew={() => {
               setSelectedLetter(null);
               setIsEditorOpen(true);
@@ -586,15 +695,10 @@ export default function App() {
             }}
             onOpenPairing={() => setIsPairingOpen(true)}
             onOpenInfo={() => setIsInfoOpen(true)}
-          />
-        ) : (
-          <TimelineView
-            letters={letters}
-            currentUser={user}
-            onViewLetter={(letter) => {
-              setSelectedLetter(letter);
-              setIsDetailOpen(true);
-            }}
+            onOpenTimeline={handleTimelineButtonClick}
+            onOpenBucketList={() => setIsBucketListOpen(true)}
+            onOpenPrayers={() => setIsPrayersOpen(true)}
+            prayers={prayers}
           />
         )}
       </main>
@@ -773,6 +877,29 @@ export default function App() {
           setIsStatusDetailOpen(false);
           setIsStatusPickerOpen(true);
         }}
+      />
+
+      {/* Our Fantasy / Bucket List Note Modal */}
+      <BucketListModal
+        isOpen={isBucketListOpen}
+        onClose={() => setIsBucketListOpen(false)}
+        bucketItems={bucketItems}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onSaveItem={handleSaveBucketItem}
+        onDeleteItem={handleDeleteBucketItem}
+      />
+
+      {/* Prayer Requests Modal */}
+      <DailyPrayerModal
+        isOpen={isPrayersOpen}
+        onClose={() => setIsPrayersOpen(false)}
+        prayers={prayers}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onSavePrayer={handleSavePrayerRequest}
+        onMarkPrayed={handleMarkPrayerAsPrayed}
+        onDeletePrayer={handleDeletePrayerRequest}
       />
 
       {/* App Startup Gatekeeper Lock Modal */}

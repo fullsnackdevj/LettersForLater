@@ -28,6 +28,10 @@ export default function AppLockModal({ isOpen, onUnlockSuccess }) {
 
     if (validateAppLockPasscode(passcode)) {
       setErrorMsg('');
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       onUnlockSuccess();
     } else {
       setErrorMsg('Incorrect passcode. Access denied.');

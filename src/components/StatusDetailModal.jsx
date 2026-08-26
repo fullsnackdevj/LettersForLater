@@ -162,13 +162,10 @@ export default function StatusDetailModal({
       >
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E2D7C7] bg-[#FAF5EC] shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">💬</span>
-            <h3 className="font-serif-vintage font-bold text-sm text-[#36271C]">
-              {isMine ? 'Your Current Status Note' : `${targetName}'s Status Note`}
-            </h3>
-          </div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2D7C7] bg-[#F4EFE6]/70 shrink-0">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[#9E8B75]">
+            {isMine ? 'Your Note' : `${targetName}'s Note`}
+          </span>
 
           <button
             type="button"
@@ -181,282 +178,160 @@ export default function StatusDetailModal({
         </div>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto custom-scrollbar flex-1">
+        <div className="overflow-y-auto custom-scrollbar flex-1 p-4 sm:p-5 space-y-4">
           
-          {/* Main Status Display Card */}
-          <div className="p-6 text-center space-y-4 bg-gradient-to-b from-[#FAF5EC] to-[#FDFBF7]">
+          {/* Main Hero: Thought/Note Bubble & Identity */}
+          <div className="space-y-3 pt-1">
             
-            {/* Avatar with Status Bubble */}
-            <div className="relative inline-block mx-auto">
-              <img
-                src={targetStatus.userPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                alt={targetName}
-                className="w-16 h-16 rounded-full object-cover border-2 border-[#D4AF37] shadow-md mx-auto"
-              />
-              <div className="absolute -bottom-1 -right-1 text-2xl bg-white rounded-full p-0.5 shadow-md border border-[#E2D7C7]">
-                {targetStatus.emoji || '💬'}
+            {/* Note Speech Bubble */}
+            <div className="relative bg-white border border-[#D2C3B0] rounded-3xl p-4 shadow-sm text-center space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A83232] bg-[#FAF5EC] px-3 py-1 rounded-full border border-[#D4AF37]/40 shadow-2xs">
+                <span className="text-sm">{targetStatus.emoji || '💭'}</span>
+                <span>{targetStatus.statusText}</span>
               </div>
-            </div>
-
-            {/* Status Text & Note */}
-            <div className="space-y-1.5">
-              <h2 className="text-xl font-bold font-serif-vintage text-[#36271C]">
-                {targetStatus.statusText}
-              </h2>
-
+              
               {targetStatus.customNote && (
-                <p className="text-xs font-handwriting text-base text-[#A83232] bg-[#FAF5EC] border border-[#D2C3B0]/60 py-1 px-3 rounded-full inline-block shadow-xs">
+                <p className="font-serif-vintage text-[15px] sm:text-base text-[#36271C] leading-snug italic pt-1 px-2">
                   "{targetStatus.customNote}"
                 </p>
               )}
 
-              {/* Sweet Cheer Display Card */}
-              {targetStatus.lastCheer && (
-                <div className="mx-auto max-w-xs p-2.5 rounded-2xl bg-white border border-[#D4AF37]/80 shadow-xs space-y-1 animate-fadeIn text-left mt-2">
-                  <div className="flex items-center justify-between text-[10px] text-[#9E8B75]">
-                    <span className="font-bold text-[#A83232] flex items-center gap-1">
-                      <span className="text-xs">💬</span>
-                      <span>
-                        {targetStatus.lastCheer.fromId === currentUserId 
-                          ? 'You cheered:' 
-                          : `${targetStatus.lastCheer.fromName || partnerName} cheered:`}
-                      </span>
-                    </span>
-                    <span className="text-[9px]">{getTimeAgo(targetStatus.lastCheer.atIso)}</span>
-                  </div>
-                  <p className="text-xs font-semibold text-[#36271C] font-serif-vintage italic leading-snug">
-                    "{targetStatus.lastCheer.text}"
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#9E8B75] pt-1">
-                <Clock className="w-3 h-3 text-[#A83232]" />
-                <span>{getTimeAgo(targetStatus.updatedAtIso)}</span>
-                <span>•</span>
-                <span className="font-mono text-[10px]">{targetStatus.updatedAtPHT ? targetStatus.updatedAtPHT.split(', ')[1] || 'PHT' : 'Today'}</span>
-              </div>
+              {/* Triangle Tail pointing to avatar below */}
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-[#D2C3B0] rotate-45" />
             </div>
 
-            {/* Seen Status Receipt */}
-            <div className="pt-1">
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium border shadow-xs ${
-                isSeenByOther
-                  ? 'bg-emerald-950/10 border-emerald-500/30 text-emerald-800'
-                  : 'bg-[#EFE9DE] border-[#D2C3B0] text-[#7A6855]'
-              }`}>
-                <Eye className="w-3 h-3 text-[#D4AF37]" />
-                <span>
-                  {isSeenByOther
-                    ? isMine ? `Seen by ${partnerName} 💕` : `Seen by you 👀`
-                    : isMine ? `Not seen by ${partnerName} yet` : `Seen by you just now`}
-                </span>
-              </span>
+            {/* Author Identity & Metadata */}
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <img
+                src={targetStatus.userPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                alt={targetName}
+                className="w-12 h-12 rounded-full object-cover border-2 border-[#D4AF37] shadow-sm"
+              />
+              <div className="text-left">
+                <h4 className="font-serif-vintage font-bold text-base text-[#36271C] capitalize leading-tight">
+                  {targetName}
+                </h4>
+                <div className="flex items-center gap-1.5 text-[11px] text-[#9E8B75] mt-0.5">
+                  <Clock className="w-3 h-3 text-[#A83232]" />
+                  <span>{getTimeAgo(targetStatus.updatedAtIso)}</span>
+                  <span>•</span>
+                  <span className="text-emerald-700 font-semibold inline-flex items-center gap-0.5">
+                    <Eye className="w-2.5 h-2.5" />
+                    <span>
+                      {isSeenByOther
+                        ? isMine ? `Seen by ${partnerName} 💕` : `Seen by you 👀`
+                        : isMine ? `Unseen` : `Seen`}
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
 
           </div>
 
-          {/* Quick Reaction Bar (For Partner's Note only - Note Creator cannot react to themselves) */}
+          {/* Quick Reaction Bar & Custom Reply (For Partner's Note) */}
           {!isMine ? (
-            <div className="px-5 py-3 border-t border-[#E2D7C7] bg-[#FAF5EC]/90 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-bold text-[#7A6855]">
-                <span>Quick Reactions</span>
-                <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
-              </div>
-
-              <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
-                {STATUS_REACTION_EMOJIS.map((emoji) => {
-                  const emojiData = targetStatus.reactions?.[emoji];
-                  const totalCount = emojiData?.count || 0;
-                  const userCounts = emojiData?.userCounts || {};
-                  let myCount = Number(userCounts[currentUserId]);
-                  if (myCount === undefined || isNaN(myCount)) {
-                    myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-                  }
-                  const isMaxed = myCount >= 10;
-                  const hasReacted = myCount > 0;
-
-                  return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => handleReactionTap(emoji)}
-                      disabled={isMaxed}
-                      className={`relative group w-full aspect-square rounded-xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
-                        isMaxed
-                          ? 'bg-gray-100 border border-gray-300 opacity-60 cursor-not-allowed'
-                          : hasReacted
-                            ? 'bg-[#FAF5EC] border border-[#D4AF37] shadow-xs hover:scale-110 active:scale-125'
-                            : 'bg-white border border-[#E2D7C7] hover:border-[#D4AF37] active:scale-125 hover:bg-[#FAF5EC]'
-                      }`}
-                      title={`Send ${emoji} (${myCount}/10)`}
-                    >
-                      <span className="text-xl group-hover:scale-110 transition-transform select-none">
-                        {emoji}
-                      </span>
-
-                      {totalCount > 0 && (
-                        <span className={`absolute -top-1.5 -right-1 px-1 py-0.2 min-w-[14px] text-[9px] font-mono font-bold rounded-full shadow-xs border text-center ${
-                          isMaxed
-                            ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]'
-                            : hasReacted
-                              ? 'bg-[#D4AF37] text-[#36271C] border-white'
-                              : 'bg-[#36271C] text-white border-white'
-                        }`}>
-                          {totalCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : totalPartnerReactions > 0 ? (
-            /* Read-only Received Reactions Summary for Creator */
-            <div className="px-5 py-3 border-t border-[#E2D7C7] bg-[#FAF5EC]/90 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-[#7A6855]">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                  <span>Reactions from {partnerName}</span>
-                </span>
-                <span className="text-[10px] text-[#9E8B75] font-normal">{totalPartnerReactions} total</span>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap justify-center pt-0.5">
-                {STATUS_REACTION_EMOJIS.map((emoji) => {
-                  const emojiData = targetStatus.reactions?.[emoji];
-                  const count = emojiData?.count || 0;
-                  if (count <= 0) return null;
-
-                  return (
-                    <span
-                      key={emoji}
-                      className="inline-flex items-center gap-1.5 bg-white border border-[#D4AF37]/60 px-3 py-1 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
-                    >
-                      <span className="text-base select-none">{emoji}</span>
-                      <span className="font-mono text-[11px] text-[#A83232] font-bold">×{count}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Quick Cheering Replies (For Partner) or Edit Button (For Own Status) */}
-          <div className="p-4 border-t border-[#E2D7C7] bg-[#FAF5EC] space-y-3">
-            {!isMine ? (
-              <div className="space-y-2.5">
-                {/* Custom Message / Reply Input Form */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!customCheerText.trim()) return;
-                    handleSendCheer(customCheerText.trim());
-                    setCustomCheerText('');
-                  }}
-                  className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
-                >
-                  <input
-                    type="text"
-                    value={customCheerText}
-                    onChange={(e) => setCustomCheerText(e.target.value)}
-                    maxLength={100}
-                    placeholder={`Write a sweet reply to ${partnerName}...`}
-                    className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!customCheerText.trim()}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                      customCheerText.trim()
-                        ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
-                        : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
-                    }`}
-                    title="Send reply"
-                  >
-                    <span>Send</span>
-                    <Send className="w-3 h-3" />
-                  </button>
-                </form>
-
-                {/* Templated Cheers Divider & Trigger */}
-                <div className="flex items-center justify-between pt-0.5">
-                  <p className="text-[11px] font-bold text-[#7A6855] text-left flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                    <span>Or send a quick cheer:</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsMoreCheersOpen(!isMoreCheersOpen)}
-                    className="text-[10px] text-[#A83232] hover:text-[#8B0000] font-bold flex items-center gap-0.5 cursor-pointer bg-white px-2 py-0.5 rounded-full border border-[#D2C3B0] transition-colors"
-                  >
-                    <span>{isMoreCheersOpen ? 'Hide categories' : 'More cheers'}</span>
-                    {isMoreCheersOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  </button>
+            <div className="pt-3 border-t border-[#E2D7C7] space-y-3">
+              
+              {/* Quick Reactions Header & Buttons */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
+                  <span>Tap to React 💕</span>
+                  <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
                 </div>
 
-                {/* Primary Contextual Auto-Populated Cheer Carousel */}
-                <div className="relative">
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x touch-pan-x px-0.5">
-                    {contextualCheers.map((cheer) => (
+                <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
+                  {STATUS_REACTION_EMOJIS.map((emoji) => {
+                    const emojiData = targetStatus.reactions?.[emoji];
+                    const totalCount = emojiData?.count || 0;
+                    const userCounts = emojiData?.userCounts || {};
+                    let myCount = Number(userCounts[currentUserId]);
+                    if (myCount === undefined || isNaN(myCount)) {
+                      myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
+                    }
+                    const isMaxed = myCount >= 10;
+                    const hasReacted = myCount > 0;
+
+                    return (
                       <button
-                        key={cheer}
+                        key={emoji}
                         type="button"
-                        onClick={() => handleSendCheer(cheer)}
-                        className="shrink-0 snap-start px-3.5 py-2 rounded-full bg-white border border-[#D2C3B0] hover:border-[#A83232] hover:bg-[#FAF5EC] text-[#4A3B2C] hover:text-[#36271C] text-xs font-semibold shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                        onClick={() => handleReactionTap(emoji)}
+                        disabled={isMaxed}
+                        className={`relative group w-full aspect-square rounded-xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
+                          isMaxed
+                            ? 'bg-gray-100 border border-gray-300 opacity-60 cursor-not-allowed'
+                            : hasReacted
+                              ? 'bg-[#FAF5EC] border-2 border-[#D4AF37] shadow-xs hover:scale-110 active:scale-125'
+                              : 'bg-white border border-[#E2D7C7] hover:border-[#D4AF37] active:scale-125 hover:bg-[#FAF5EC]'
+                        }`}
+                        title={`Send ${emoji} (${myCount}/10)`}
                       >
-                        {cheer}
+                        <span className="text-xl group-hover:scale-110 transition-transform select-none">
+                          {emoji}
+                        </span>
+
+                        {totalCount > 0 && (
+                          <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[15px] text-[9px] font-mono font-bold rounded-full shadow-xs border text-center ${
+                            isMaxed
+                              ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]'
+                              : hasReacted
+                                ? 'bg-[#D4AF37] text-[#36271C] border-white'
+                                : 'bg-[#36271C] text-white border-white'
+                          }`}>
+                            {totalCount}
+                          </span>
+                        )}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-
-                {/* Optional Expandable Categorized Cheers Dropdown/Drawer */}
-                {isMoreCheersOpen && (
-                  <div className="mt-2 p-3 rounded-2xl bg-white border border-[#E2D7C7] shadow-inner space-y-2.5 animate-fadeIn">
-                    {/* Category tabs */}
-                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
-                      {CATEGORIZED_CHEERS.map((cat, idx) => (
-                        <button
-                          key={cat.category}
-                          type="button"
-                          onClick={() => setActiveCheerCategory(idx)}
-                          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
-                            activeCheerCategory === idx
-                              ? 'bg-[#A83232] text-[#F8E3B6] shadow-2xs'
-                              : 'bg-[#FAF5EC] text-[#7A6855] hover:bg-[#EFE9DE]'
-                          }`}
-                        >
-                          {cat.category}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Active category cheers in smooth horizontal row or wrap */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                      {CATEGORIZED_CHEERS[activeCheerCategory]?.cheers.map((cheer) => (
-                        <button
-                          key={cheer}
-                          type="button"
-                          onClick={() => handleSendCheer(cheer)}
-                          className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium bg-[#FAF5EC] border border-[#E2D7C7] hover:border-[#A83232] hover:bg-[#FAF0E4] text-[#4A3B2C] transition-all hover:scale-105 active:scale-95 cursor-pointer whitespace-nowrap"
-                        >
-                          {cheer}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Sent Cheer Confirmation */}
-                {sentCheer && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="truncate">Sent reply: "{sentCheer}"</span>
-                  </div>
-                )}
               </div>
-            ) : (
+
+              {/* Custom Sweet Reply Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!customCheerText.trim()) return;
+                  handleSendCheer(customCheerText.trim());
+                  setCustomCheerText('');
+                }}
+                className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
+              >
+                <input
+                  type="text"
+                  value={customCheerText}
+                  onChange={(e) => setCustomCheerText(e.target.value)}
+                  maxLength={100}
+                  placeholder={`Write a sweet reply to ${partnerName}...`}
+                  className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none font-medium"
+                />
+                <button
+                  type="submit"
+                  disabled={!customCheerText.trim()}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                    customCheerText.trim()
+                      ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
+                      : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
+                  }`}
+                  title="Send reply"
+                >
+                  <span>Send</span>
+                  <Send className="w-3 h-3" />
+                </button>
+              </form>
+
+              {/* Sent Reply Toast / Confirmation */}
+              {sentCheer && (
+                <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate">Sent reply: "{sentCheer}"</span>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-[#E2D7C7]">
               <button
                 type="button"
                 onClick={() => {
@@ -468,8 +343,8 @@ export default function StatusDetailModal({
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Change My Status</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
         </div>
 

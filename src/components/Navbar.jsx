@@ -31,7 +31,8 @@ export default function Navbar({
   onOpenStoryArchive,
   onOpenStoryIntro,
   onOpenStatusPicker,
-  onOpenStatusDetail
+  onOpenStatusDetail,
+  onOpenBucketList
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { downloadImage } from '../utils/fileDownloader';
+import VintageAudioPlayer from './VintageAudioPlayer';
 
 export default function LetterDetailModal({ 
   letter, 
@@ -274,6 +275,18 @@ export default function LetterDetailModal({
             <div className="bg-[#FAF5EC] border-l-4 border-[#D4AF37] p-3.5 rounded-r-xl text-xs text-[#36271C]">
               <p className="font-bold text-[#AA7C11] mb-1">⭐ Why this was marked Very Important:</p>
               <p className="italic font-serif">{letter.importantTagReason}</p>
+            </div>
+          )}
+
+          {/* Attached Spoken Words Voice Note */}
+          {letter.audioNote && (letter.audioNote.storageUrl || letter.audioNote.dataUrl) && (
+            <div className="py-1">
+              <VintageAudioPlayer
+                audioUrl={letter.audioNote.storageUrl || letter.audioNote.dataUrl}
+                durationSec={letter.audioNote.durationSec || 0}
+                authorName={letter.authorName}
+                title={letter.title}
+              />
             </div>
           )}
 

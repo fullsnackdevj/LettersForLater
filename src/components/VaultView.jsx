@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Lock, 
@@ -32,7 +32,13 @@ export default function VaultView({
   onEditLetter, 
   onViewLetter, 
   onOpenPairing,
-  onOpenInfo
+  onOpenInfo,
+  onOpenTimeline,
+  onOpenBucketList,
+  onOpenPrayers,
+  isLettersUnlocked = false,
+  bucketItems = [],
+  prayers = []
 }) {
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'important' | 'drafts'
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
@@ -41,10 +47,95 @@ export default function VaultView({
   const ITEMS_PER_PAGE = 6;
 
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
+  const currentUserId = currentUser?.uid || 'demo-user-1';
 
   // Separate user and partner letters
-  const myLetters = letters.filter(l => l.authorId === (currentUser?.uid || 'demo-user-1'));
-  const partnerLetters = letters.filter(l => l.authorId !== (currentUser?.uid || 'demo-user-1'));
+  const myLetters = letters.filter(l => l.authorId === currentUserId);
+  const partnerLetters = letters.filter(l => l.authorId !== currentUserId);
+
+  // 1. Track Seen Partner Letters
+  const [lastSeenPartnerLetters, setLastSeenPartnerLetters] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`lfl_seen_partner_letters_${currentUserId}`);
+      return stored !== null ? Number(stored) : partnerLetters.length;
+    } catch (e) {
+      return partnerLetters.length;
+    }
+  });
+
+  const hasNewPartnerLetters = partnerLetters.length > lastSeenPartnerLetters;
+
+  const handlePartnerLettersClick = () => {
+    try {
+      localStorage.setItem(`lfl_seen_partner_letters_${currentUserId}`, partnerLetters.length);
+      setLastSeenPartnerLetters(partnerLetters.length);
+    } catch (e) {}
+  };
+
+  // 2. Track Seen Partner Bucket List Items (Exclude own additions)
+  const partnerBucketItems = useMemo(() => {
+    return bucketItems.filter(i => i.createdBy && i.createdBy !== currentUserId);
+  }, [bucketItems, currentUserId]);
+
+  const [lastSeenBucketTime, setLastSeenBucketTime] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`lfl_seen_partner_bucket_${currentUserId}`);
+      return stored !== null ? Number(stored) : Date.now();
+    } catch (e) {
+      return Date.now();
+    }
+  });
+
+  const hasNewPartnerBucketItems = useMemo(() => {
+    return partnerBucketItems.some(i => {
+      const createdTime = new Date(i.createdAtIso || 0).getTime();
+      return createdTime > lastSeenBucketTime;
+    });
+  }, [partnerBucketItems, lastSeenBucketTime]);
+
+  const handleOpenBucketListWithSeen = () => {
+    try {
+      const now = Date.now();
+      localStorage.setItem(`lfl_seen_partner_bucket_${currentUserId}`, now);
+      setLastSeenBucketTime(now);
+    } catch (e) {}
+    if (onOpenBucketList) onOpenBucketList();
+  };
+
+  // 3. Track Seen Prayer Activity (New partner request OR partner prayed for your request)
+  const [lastSeenPrayerTime, setLastSeenPrayerTime] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`lfl_seen_partner_prayer_${currentUserId}`);
+      return stored !== null ? Number(stored) : Date.now();
+    } catch (e) {
+      return Date.now();
+    }
+  });
+
+  const hasNewPrayerActivity = useMemo(() => {
+    return prayers.some(p => {
+      // Case A: Partner added a new active request
+      if (p.createdBy && p.createdBy !== currentUserId && !p.isArchived) {
+        const createdTime = new Date(p.createdAtIso || 0).getTime();
+        if (createdTime > lastSeenPrayerTime) return true;
+      }
+      // Case B: Partner prayed for your request
+      if (p.createdBy === currentUserId && p.prayedBy && p.prayedBy !== currentUserId) {
+        const prayedTime = new Date(p.prayedAtIso || p.createdAtIso || 0).getTime();
+        if (prayedTime > lastSeenPrayerTime) return true;
+      }
+      return false;
+    });
+  }, [prayers, currentUserId, lastSeenPrayerTime]);
+
+  const handleOpenPrayersWithSeen = () => {
+    try {
+      const now = Date.now();
+      localStorage.setItem(`lfl_seen_partner_prayer_${currentUserId}`, now);
+      setLastSeenPrayerTime(now);
+    } catch (e) {}
+    if (onOpenPrayers) onOpenPrayers();
+  };
 
   // Filtered & Sorted list (Default: Newest First)
   const processedLetters = letters
@@ -76,105 +167,113 @@ export default function VaultView({
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-8">
       
-      {/* 2032 Countdown & Vault Banner (Compact Mobile First) */}
-      <div className="relative bg-gradient-to-br from-[#4A1010] via-[#6E1A1A] to-[#36271C] text-[#F8E3B6] rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl overflow-hidden border border-[#D4AF37]/40 space-y-3">
+      {/* 2032 Countdown & Vault Banner */}
+      <div className="relative bg-gradient-to-br from-[#4A0E0E] via-[#5C1515] to-[#2E120A] text-[#F8E3B6] rounded-3xl p-5 sm:p-8 shadow-2xl overflow-hidden border border-[#D4AF37]/40 space-y-4">
         
-        {/* Background Decorative Seals */}
-        <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none select-none">
-          <Mail className="w-32 h-32 sm:w-48 sm:h-48 text-[#F3E5AB]" />
+        {/* Soft Ambient Glow & Postal Watermark */}
+        <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none select-none">
+          <Mail className="w-48 h-48 sm:w-64 sm:h-64 text-[#F8E3B6]" />
         </div>
+        <div className="absolute top-0 right-1/4 w-72 h-72 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Info / How It Works Icon Button (Positioned at top right of banner) */}
-        {onOpenInfo && (
-          <button
-            type="button"
-            onClick={onOpenInfo}
-            className="absolute top-3.5 right-3.5 sm:top-5 sm:right-6 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-[#FAF5EC]/15 hover:bg-[#FAF5EC]/25 text-[#F8E3B6] hover:text-white border border-[#D4AF37]/60 transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md"
-            title="How LettersForLater Works"
-            aria-label="How LettersForLater Works"
-          >
-            <HelpCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-[#F8E3B6]" />
-          </button>
-        )}
-
-        <div className="relative z-10 max-w-3xl space-y-2">
+        <div className="relative z-10 max-w-3xl space-y-3">
+          
           {/* Time-based Greeting */}
-          <h1 className="text-lg sm:text-2xl lg:text-3xl font-handwriting text-[#F3E5AB]/90 tracking-wide">
-            {(() => {
-              const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })).getHours();
-              const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
-              const icon = hour < 12 ? '☀️' : hour < 18 ? '🌤️' : '🌙';
-              return `${greeting}, ${getNickname(currentUser?.displayName)}! ${icon}`;
-            })()}
-          </h1>
-
-          <div className="inline-flex items-center gap-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F3E5AB] text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full backdrop-blur-sm">
-            <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D4AF37]" />
-            <span>Time Capsule Vault • Sealed Until August 6, 2032</span>
+          <div>
+            <h1 className="text-lg sm:text-2xl font-handwriting text-[#F8E3B6] tracking-wide">
+              {(() => {
+                const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })).getHours();
+                const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+                const icon = hour < 12 ? '☀️' : hour < 18 ? '🌤️' : '🌙';
+                return `${greeting}, ${getNickname(currentUser?.displayName)}! ${icon}`;
+              })()}
+            </h1>
           </div>
 
-          <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold font-serif-vintage tracking-tight text-[#FDFBF7]">
+          {/* Elegant Shimmering Headline */}
+          <h2 className="text-[18px] sm:text-3xl lg:text-4xl font-bold font-serif-vintage tracking-tight bg-gradient-to-r from-[#FFFDF9] via-[#F8E3B6] to-[#E6C687] bg-clip-text text-transparent">
             Writing for our future selves.
           </h2>
 
-          <p className="hidden sm:block text-sm text-[#F4EFE6]/80 leading-relaxed font-handwriting text-xl">
-            Letters written today remain safely locked in our cloud vault. Every memory, photo attachment, and PHT timestamp will be revealed together when 2032 arrives.
+          <p className="hidden md:block text-xs sm:text-sm text-[#F4EFE6]/80 leading-relaxed font-sans max-w-2xl">
+            Every memory, photo, and prayer sealed today in our private vault will be revealed together when 2032 arrives.
           </p>
 
-          {/* Compact Live Countdown Grid (Single row on all screens) */}
-          <div className="pt-1 grid grid-cols-4 gap-2 max-w-md">
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
-              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
-                {countdown.years}
-              </span>
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Yrs</span>
-            </div>
+          {/* Glassmorphism Countdown Timer Ribbon */}
+          <div className="pt-1">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-md bg-black/25 backdrop-blur-xl border border-[#D4AF37]/30 p-2 sm:p-2.5 rounded-2xl shadow-inner">
+              
+              <div className="bg-white/[0.06] border border-[#D4AF37]/20 py-2 sm:py-2.5 px-1 rounded-xl text-center shadow-xs">
+                <span className="block font-serif-vintage text-lg sm:text-3xl font-bold text-[#FFFDF9] leading-none">
+                  {countdown.years}
+                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#F8E3B6]/70 font-mono font-semibold mt-1.5 block">
+                  Years
+                </span>
+              </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
-              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
-                {countdown.days}
-              </span>
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Days</span>
-            </div>
+              <div className="bg-white/[0.06] border border-[#D4AF37]/20 py-2 sm:py-2.5 px-1 rounded-xl text-center shadow-xs">
+                <span className="block font-serif-vintage text-lg sm:text-3xl font-bold text-[#FFFDF9] leading-none">
+                  {countdown.days}
+                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#F8E3B6]/70 font-mono font-semibold mt-1.5 block">
+                  Days
+                </span>
+              </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
-              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
-                {countdown.hours}
-              </span>
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Hrs</span>
-            </div>
+              <div className="bg-white/[0.06] border border-[#D4AF37]/20 py-2 sm:py-2.5 px-1 rounded-xl text-center shadow-xs">
+                <span className="block font-serif-vintage text-lg sm:text-3xl font-bold text-[#FFFDF9] leading-none">
+                  {countdown.hours}
+                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#F8E3B6]/70 font-mono font-semibold mt-1.5 block">
+                  Hours
+                </span>
+              </div>
 
-            <div className="bg-black/30 backdrop-blur-md border border-[#D4AF37]/30 p-1.5 sm:p-2.5 rounded-xl text-center">
-              <span className="block font-mono text-base sm:text-2xl font-bold text-[#F3E5AB]">
-                {countdown.minutes}
-              </span>
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#EFE9DE]/70 font-semibold">Mins</span>
+              <div className="bg-white/[0.06] border border-[#D4AF37]/20 py-2 sm:py-2.5 px-1 rounded-xl text-center shadow-xs">
+                <span className="block font-serif-vintage text-lg sm:text-3xl font-bold text-[#FFFDF9] leading-none">
+                  {countdown.minutes}
+                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#F8E3B6]/70 font-mono font-semibold mt-1.5 block">
+                  Mins
+                </span>
+              </div>
+
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
 
-      {/* Pair Stats & Write Action Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+      {/* Pair Stats, Bucket List, Daily Prayer & Write Action Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         
         {/* User Letter Count Card */}
-        <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-5 rounded-2xl shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#A83232] shrink-0">
-            <PenTool className="w-4 h-4 sm:w-6 sm:h-6" />
+        <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-4 rounded-2xl shadow-sm flex items-center gap-3">
+          <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
+            <PenTool className="w-4 h-4 sm:w-5 sm:h-5 text-[#F8E3B6]" />
           </div>
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Your Letters</p>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-[#36271C]">
+            <p className="text-lg sm:text-2xl font-bold font-serif text-[#36271C]">
               {myLetters.filter(l => !l.isDraft).length} <span className="text-[10px] sm:text-xs font-normal text-[#9E8B75]">sealed</span>
             </p>
           </div>
         </div>
 
         {/* Partner Letter Count Card */}
-        <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-5 rounded-2xl shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 shrink-0">
-            <Lock className="w-4 h-4 sm:w-6 sm:h-6" />
+        <div 
+          onClick={handlePartnerLettersClick}
+          className="relative bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-4 rounded-2xl shadow-sm flex items-center gap-3 transition-all cursor-pointer hover:border-[#D4AF37]"
+        >
+          {hasNewPartnerLetters && (
+            <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New letter from partner">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+            </span>
+          )}
+          <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-[#F8E3B6]" />
           </div>
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">
@@ -184,25 +283,121 @@ export default function VaultView({
                 return me === u2 ? 'Jay' : u2;
               })()}'s
             </p>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-[#36271C]">
+            <p className="text-lg sm:text-2xl font-bold font-serif text-[#36271C]">
               {partnerLetters.length} <span className="text-[10px] sm:text-xs font-normal text-rose-700 font-semibold">waiting</span>
             </p>
           </div>
         </div>
 
-        {/* Write Letter Action Button */}
-        <button
-          onClick={onWriteNew}
-          className="col-span-2 md:col-span-1 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] p-3 sm:p-5 rounded-2xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 group border border-[#D4AF37]/50"
-        >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#8B0000] border border-[#F8E3B6]/40 flex items-center justify-center text-[#F8E3B6] group-hover:rotate-12 transition-transform shrink-0">
-            <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="text-left">
-            <p className="text-xs sm:text-sm font-bold text-[#F8E3B6]">Write Letter for Later</p>
-            <p className="text-[10px] sm:text-[11px] text-[#F8E3B6]/80">Stamp with immutable PHT time & photos</p>
-          </div>
-        </button>
+        {/* Our Bucket List Action Card */}
+        {onOpenBucketList && (
+          <button
+            type="button"
+            onClick={handleOpenBucketListWithSeen}
+            className="relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-3 sm:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center gap-3 text-left cursor-pointer group"
+          >
+            {hasNewPartnerBucketItems && (
+              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New wish added by partner">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+              </span>
+            )}
+            <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 group-hover:scale-105 transition-transform shadow-xs">
+              ✨
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Our Bucket List</p>
+              <p className="text-sm sm:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+                {bucketItems.length > 0 ? `${bucketItems.filter(i => i.isCompleted).length}/${bucketItems.length} Goals` : 'Our Fantasies'}
+              </p>
+            </div>
+          </button>
+        )}
+
+        {/* Prayer Request Action Card */}
+        {onOpenPrayers && (
+          <button
+            type="button"
+            onClick={handleOpenPrayersWithSeen}
+            className="relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-3 sm:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center gap-3 text-left cursor-pointer group"
+          >
+            {hasNewPrayerActivity && (
+              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New prayer activity">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+              </span>
+            )}
+            <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 group-hover:scale-105 transition-transform shadow-xs">
+              🙏
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Prayer Request</p>
+              <p className="text-sm sm:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+                {(() => {
+                  const now = Date.now();
+                  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+                  const active = prayers.filter(p => !p.isArchived && (now - new Date(p.createdAtIso || 0).getTime() <= TWENTY_FOUR_HOURS));
+                  if (active.length > 0) {
+                    return `${active.length} ${active.length === 1 ? 'Request' : 'Requests'}`;
+                  }
+                  return 'Add Request';
+                })()}
+              </p>
+            </div>
+          </button>
+        )}
+
+        {/* Write Letter & Timeline Actions Column */}
+        <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+          {/* Write Letter Action Button */}
+          <button
+            onClick={onWriteNew}
+            className="w-full bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] p-2.5 sm:p-3 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 group border border-[#D4AF37]/50 cursor-pointer"
+          >
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#8B0000] border border-[#F8E3B6]/40 flex items-center justify-center text-[#F8E3B6] group-hover:rotate-12 transition-transform shrink-0">
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-[#F8E3B6]">Write Letter for Later</span>
+          </button>
+
+          {/* Locked Timeline Button directly below Write Letter — matching exact size & height */}
+          <button
+            type="button"
+            onClick={onOpenTimeline}
+            disabled={!countdown.isUnlocked}
+            className={`w-full p-2.5 sm:p-3 rounded-xl transition-all flex items-center justify-center gap-2 border ${
+              !countdown.isUnlocked
+                ? 'bg-[#EFE9DE]/90 text-[#9E8B75] border-[#D2C3B0]/60 cursor-not-allowed opacity-80'
+                : isLettersUnlocked
+                  ? 'bg-[#D4AF37] hover:bg-[#AA7C11] text-[#3D2600] border-[#AA7C11]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
+                  : 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border-[#D4AF37]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
+            }`}
+            title={!countdown.isUnlocked ? 'Timeline remains locked until August 6, 2032' : 'View Unlocked Timeline'}
+          >
+            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border flex items-center justify-center shrink-0 ${
+              !countdown.isUnlocked
+                ? 'bg-[#E4DCD0] border-[#D2C3B0] text-[#9E8B75]'
+                : isLettersUnlocked
+                  ? 'bg-[#AA7C11] border-[#F8E3B6]/40 text-[#F8E3B6]'
+                  : 'bg-[#8B0000] border-[#F8E3B6]/40 text-[#F8E3B6]'
+            }`}>
+              {!countdown.isUnlocked ? (
+                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              ) : isLettersUnlocked ? (
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              ) : (
+                <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              )}
+            </div>
+            <span className="text-xs sm:text-sm font-bold truncate">
+              {!countdown.isUnlocked 
+                ? 'Locked Until The Right Time' 
+                : isLettersUnlocked 
+                  ? 'Unlocked Timeline' 
+                  : 'Reveal All The Letters'}
+            </span>
+          </button>
+        </div>
 
       </div>
 

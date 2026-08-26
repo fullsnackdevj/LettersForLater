@@ -12,6 +12,10 @@ export default function AuthModal({ isOpen, onClose, onSignInGoogle, canClose = 
     setError('');
     try {
       await onSignInGoogle();
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       onClose();
     } catch (err) {
       console.error('Sign-in error:', err);

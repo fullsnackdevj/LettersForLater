@@ -17,10 +17,13 @@ import {
   CloudRain,
   Sun,
   Moon,
-  PartyPopper
+  PartyPopper,
+  Mic,
+  AlertCircle
 } from 'lucide-react';
 import { getCurrentPHT } from '../utils/pht';
 import { compressImages } from '../utils/imageCompressor';
+import AudioRecorderWidget from './AudioRecorderWidget';
 
 export const MOOD_CATEGORIES = [
   {
@@ -83,6 +86,9 @@ export default function LetterEditorModal({
   const [importantTagReason, setImportantTagReason] = useState('');
   const [mood, setMood] = useState('Warm & Hopeful');
   const [images, setImages] = useState([]);
+  const [audioNote, setAudioNote] = useState(null);
+  const [showAudioRecorder, setShowAudioRecorder] = useState(false);
+  const [showAbandonPrompt, setShowAbandonPrompt] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
@@ -99,6 +105,9 @@ export default function LetterEditorModal({
       setImportantTagReason(existingLetter.importantTagReason || '');
       setMood(existingLetter.mood || 'Warm & Hopeful');
       setImages(existingLetter.images || []);
+      setAudioNote(existingLetter.audioNote || null);
+      setShowAudioRecorder(Boolean(existingLetter.audioNote));
+      setShowAbandonPrompt(false);
       setIsDraft(Boolean(existingLetter.isDraft));
       // Preserve original immutable PHT & ISO timestamps from when it was first drafted
       setPhtStamp(existingLetter.createdAtPHT || getCurrentPHT().fullString);
@@ -114,6 +123,9 @@ export default function LetterEditorModal({
       setImportantTagReason('');
       setMood('Warm & Hopeful');
       setImages([]);
+      setAudioNote(null);
+      setShowAudioRecorder(false);
+      setShowAbandonPrompt(false);
       setIsDraft(false);
     }
   }, [existingLetter, isOpen]);
@@ -160,6 +172,7 @@ export default function LetterEditorModal({
         importantTagReason: isVeryImportant ? importantTagReason.trim() : '',
         mood,
         images,
+        audioNote,
         isDraft: saveAsDraft,
         // Immutable initial creation PHT and ISO stamp (preserved from first draft)
         createdAtPHT: phtStamp,
@@ -173,11 +186,47 @@ export default function LetterEditorModal({
     }
   };
 
+  const hasUnsavedChanges = () => {
+    if (existingLetter) {
+      const titleChanged = (title || '').trim() !== (existingLetter.title || '').trim();
+      const contentChanged = (content || '').trim() !== (existingLetter.content || '').trim();
+      const moodChanged = mood !== (existingLetter.mood || 'Warm & Hopeful');
+      const imagesChanged = (images?.length || 0) !== (existingLetter.images?.length || 0);
+      const audioChanged = Boolean(audioNote) !== Boolean(existingLetter.audioNote);
+      return titleChanged || contentChanged || moodChanged || imagesChanged || audioChanged;
+    }
+    return Boolean(title.trim() || content.trim() || images.length > 0 || audioNote);
+  };
+
+  const handleRequestClose = () => {
+    if (hasUnsavedChanges()) {
+      setShowAbandonPrompt(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowAbandonPrompt(false);
+    onClose();
+  };
+
+  const handleSaveDraftAndClose = async () => {
+    setShowAbandonPrompt(false);
+    await handleSubmit(true);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#36271C]/70 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#36271C]/70 backdrop-blur-sm overflow-y-auto animate-fadeIn select-none"
+      onClick={handleRequestClose}
+    >
       
       {/* Wooden Desk Outer Backdrop */}
-      <div className="relative w-full max-w-2xl bg-[#FDFBF7] border-2 border-[#D2C3B0] rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      <div 
+        className="relative w-full max-w-2xl bg-[#FDFBF7] border-2 border-[#D2C3B0] rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Vintage Paper Tape Top Header */}
         <div className="tape-strip"></div>
@@ -201,8 +250,10 @@ export default function LetterEditorModal({
           </div>
 
           <button
-            onClick={onClose}
-            className="text-[#9E8B75] hover:text-[#36271C] p-1.5 rounded-full hover:bg-[#EFE9DE] transition-colors shrink-0"
+            type="button"
+            onClick={handleRequestClose}
+            className="text-[#9E8B75] hover:text-[#36271C] p-1.5 rounded-full hover:bg-[#EFE9DE] transition-colors shrink-0 cursor-pointer"
+            title="Close letter"
           >
             <X className="w-5 h-5" />
           </button>
@@ -358,6 +409,43 @@ export default function LetterEditorModal({
             </label>
           </div>
 
+          {/* 60-Second Spoken Voice Note Attachment */}
+          <div className="border-t border-[#E2D7C7] pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-[#A83232]" />
+                <span className="text-xs font-bold text-[#4A3B2C] uppercase tracking-wider">
+                  Voice Note Attachment {audioNote ? '(1 Recorded)' : ''}
+                </span>
+              </div>
+
+              {!showAudioRecorder && !audioNote && (
+                <button
+                  type="button"
+                  onClick={() => setShowAudioRecorder(true)}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#A83232] hover:text-[#8B0000] bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] px-3 py-1 rounded-full transition-all cursor-pointer"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>+ Record Voice Note (60s)</span>
+                </button>
+              )}
+            </div>
+
+            {showAudioRecorder && (
+              <AudioRecorderWidget
+                existingAudio={audioNote}
+                onAudioRecorded={(audioData) => {
+                  setAudioNote(audioData);
+                }}
+                onCancel={() => {
+                  if (!audioNote) {
+                    setShowAudioRecorder(false);
+                  }
+                }}
+              />
+            )}
+          </div>
+
         </div>
 
         {/* Footer Actions */}
@@ -375,8 +463,8 @@ export default function LetterEditorModal({
           <div className="flex items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-transparent text-[#9E8B75] hover:text-[#36271C] text-xs font-semibold"
+              onClick={handleRequestClose}
+              className="px-4 py-2 bg-transparent text-[#9E8B75] hover:text-[#36271C] text-xs font-semibold cursor-pointer"
             >
               Cancel
             </button>
@@ -385,13 +473,72 @@ export default function LetterEditorModal({
               type="button"
               onClick={() => handleSubmit(false)}
               disabled={isSaving || isCompressing}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold rounded-xl shadow-md transition-all hover:scale-105"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold rounded-xl shadow-md transition-all hover:scale-105 cursor-pointer"
             >
               <Lock className="w-4 h-4" />
               <span>{isSaving ? 'Sealing...' : 'Seal Letter in Vault'}</span>
             </button>
           </div>
         </div>
+
+        {/* Abandon / Save Draft Confirmation Dialog */}
+        {showAbandonPrompt && (
+          <div 
+            className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+            onClick={() => setShowAbandonPrompt(false)}
+          >
+            <div 
+              className="relative bg-[#FAF5EC] border-2 border-[#E2D7C7] rounded-3xl p-6 text-center max-w-sm w-full space-y-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Dismiss / Keep Writing X icon */}
+              <button
+                type="button"
+                onClick={() => setShowAbandonPrompt(false)}
+                className="absolute top-4 right-4 text-[#9E8B75] hover:text-[#36271C] p-1.5 rounded-full hover:bg-[#EFE9DE] transition-colors cursor-pointer"
+                title="Keep writing"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="wax-seal w-12 h-12 mx-auto text-xl shadow-md">
+                ✍️
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="font-serif-vintage font-bold text-lg text-[#36271C]">
+                  Unsealed Words in Progress
+                </h3>
+                <p className="text-xs text-[#7A6855] leading-relaxed">
+                  You have unsealed changes. Would you like to preserve this letter as a draft or discard it?
+                </p>
+              </div>
+
+              {/* 2 Clean Side-by-Side Action Buttons */}
+              <div className="flex items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmDiscard}
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 rounded-xl border border-[#D2C3B0] bg-white hover:bg-rose-50 hover:border-rose-300 text-rose-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Discard</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveDraftAndClose}
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 border border-[#D4AF37]/50 hover:scale-[1.02] cursor-pointer disabled:opacity-50"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>{isSaving ? 'Saving...' : 'Save Draft'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
