@@ -14,7 +14,8 @@ import {
   onSnapshot,
   serverTimestamp,
   getDocs,
-  increment
+  increment,
+  runTransaction
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
@@ -625,49 +626,59 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
 
   if (isFirebaseConfigured && db) {
     const storyRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
-    const snap = await getDoc(storyRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      // Guard: Author should not react to their own story
-      if (data.authorId === userId) {
-        return data.reactions || {};
-      }
-
-      const currentReactions = data.reactions || {};
-      const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
-      
-      const userCounts = { ...(emojiData.userCounts || {}) };
-      // Fallback: if userCounts wasn't initialized but user is in users list, initialize with count
-      if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
-        userCounts[userId] = emojiData.count;
-      }
-      const currentCountForUser = Number(userCounts[userId]) || 0;
-      
-      if (currentCountForUser >= 10) {
-        return currentReactions; // Max 10 reached for this user
-      }
-      
-      userCounts[userId] = currentCountForUser + 1;
-      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-      
-      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
-      if (!newUsers.includes(userId)) {
-        newUsers.push(userId);
-      }
-      
-      const updatedReactions = {
-        ...currentReactions,
-        [emoji]: {
-          count: totalCount,
-          userCounts,
-          users: newUsers,
-          lastReactedBy: userName,
-          lastReactedAt: timestamp
+    
+    try {
+      const updatedReactions = await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(storyRef);
+        if (!snap.exists()) return null;
+        
+        const data = snap.data();
+        // Guard: Author should not react to their own story
+        if (data.authorId === userId) {
+          return data.reactions || {};
         }
-      };
 
-      await updateDoc(storyRef, { reactions: updatedReactions });
+        const currentReactions = data.reactions || {};
+        const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
+        
+        const userCounts = { ...(emojiData.userCounts || {}) };
+        // Fallback: if userCounts wasn't initialized but user is in users list, initialize with count
+        if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
+          userCounts[userId] = emojiData.count;
+        }
+        const currentCountForUser = Number(userCounts[userId]) || 0;
+        
+        if (currentCountForUser >= 10) {
+          return currentReactions; // Max 10 reached for this user
+        }
+        
+        userCounts[userId] = currentCountForUser + 1;
+        const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+        
+        const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+        if (!newUsers.includes(userId)) {
+          newUsers.push(userId);
+        }
+        
+        const newReactions = {
+          ...currentReactions,
+          [emoji]: {
+            count: totalCount,
+            userCounts,
+            users: newUsers,
+            lastReactedBy: userName,
+            lastReactedAt: timestamp
+          }
+        };
+
+        transaction.update(storyRef, { reactions: newReactions });
+        return newReactions;
+      });
+      
       return updatedReactions;
+    } catch (err) {
+      console.error('Transaction failed for reactToStory:', err);
+      return null;
     }
   }
 

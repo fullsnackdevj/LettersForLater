@@ -459,7 +459,7 @@ export default function StoryViewerModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-fadeIn select-none touch-none">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-lg animate-fadeIn select-none touch-none">
       
       {/* Floating Reactions Overlay */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">

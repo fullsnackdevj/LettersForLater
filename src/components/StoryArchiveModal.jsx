@@ -307,13 +307,13 @@ export default function StoryArchiveModal({
         {/* ─────────────────────────────────────────────────────────────
             MAIN GALLERY CONTENT (Dynamic based on Scope: Years, Months, All)
            ───────────────────────────────────────────────────────────── */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="px-4 sm:px-6 overflow-y-auto flex-1 custom-scrollbar">
 
           {/* ─────────────────────────────────────────────────────────
               VIEW 1: YEARS OVERVIEW (iOS Style)
              ───────────────────────────────────────────────────────── */}
           {timelineScope === 'years' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4 animate-fadeIn py-4 sm:py-6">
               {yearGroups.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {yearGroups.map((group) => (
@@ -384,7 +384,7 @@ export default function StoryArchiveModal({
               VIEW 2: MONTHS OVERVIEW (iOS Style)
              ───────────────────────────────────────────────────────── */}
           {timelineScope === 'months' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4 animate-fadeIn py-4 sm:py-6">
               {selectedYearKey !== 'all' && (
                 <div className="flex items-center justify-between pb-2 border-b border-[#E2D7C7]">
                   <button
@@ -468,7 +468,7 @@ export default function StoryArchiveModal({
               VIEW 3: ALL DETAILED SNAPSHOTS (Grouped by Date Headers)
              ───────────────────────────────────────────────────────── */}
           {timelineScope === 'all' && (
-            <div className="space-y-6 animate-fadeIn">
+            <div className="space-y-6 animate-fadeIn py-4 sm:py-6">
               
               {/* Selected Month Header Banner when filtered */}
               {selectedMonthKey !== 'all' && (
@@ -499,7 +499,7 @@ export default function StoryArchiveModal({
                   <div key={section.dayKey} className="space-y-3">
                     
                     {/* Sticky Date Section Header */}
-                    <div className="flex items-center gap-2 sticky top-0 bg-[#FDFBF7]/95 backdrop-blur-md py-1.5 z-10 border-b border-[#E2D7C7]/60">
+                    <div className="flex items-center gap-2 sticky top-0 bg-[#FDFBF7]/95 backdrop-blur-md py-2 -mx-4 sm:-mx-6 px-4 sm:px-6 z-10 border-b border-[#E2D7C7]/60">
                       <Calendar className="w-3.5 h-3.5 text-[#A83232]" />
                       <h3 className="font-serif-vintage font-bold text-sm text-[#36271C]">
                         {section.dayLabel}
