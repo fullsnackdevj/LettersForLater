@@ -3,15 +3,14 @@ import {
   X, 
   Clock, 
   Eye, 
-  Edit3,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Send
+  Edit3, 
+  Check, 
+  Sparkles, 
+  Send,
+  MessageCircleHeart
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
-import { getCheersForStatus, CATEGORIZED_CHEERS } from '../data/statusPresets';
+import { getCheersForStatus } from '../data/statusPresets';
 
 const STATUS_REACTION_EMOJIS = ['❤️', '💪', '☕', '🥰', '🫶', '✨'];
 
@@ -29,8 +28,6 @@ export default function StatusDetailModal({
   const [floatingParticles, setFloatingParticles] = useState([]);
   const [sentCheer, setSentCheer] = useState(null);
   const [customCheerText, setCustomCheerText] = useState('');
-  const [isMoreCheersOpen, setIsMoreCheersOpen] = useState(false);
-  const [activeCheerCategory, setActiveCheerCategory] = useState(0);
 
   const currentUserId = currentUser?.uid || 'demo-user-1';
   const targetUserId = targetStatus?.userId;
@@ -46,10 +43,9 @@ export default function StatusDetailModal({
     }
   }, [isOpen, targetStatus, targetUserId, currentUserId, onMarkStatusAsViewed]);
 
-  // Reset dropdown state when closed
+  // Reset state when closed
   useEffect(() => {
     if (!isOpen) {
-      setIsMoreCheersOpen(false);
       setSentCheer(null);
       setCustomCheerText('');
     }
@@ -87,6 +83,11 @@ export default function StatusDetailModal({
     (sum, r) => sum + (Number(r?.count) || 0),
     0
   );
+
+  // All cheers / replies on this note
+  const allCheers = Array.isArray(targetStatus.cheers) && targetStatus.cheers.length > 0
+    ? targetStatus.cheers
+    : (targetStatus.lastCheer ? [targetStatus.lastCheer] : []);
 
   // Handle reaction tap
   const handleReactionTap = (emoji) => {
@@ -178,7 +179,7 @@ export default function StatusDetailModal({
         </div>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto custom-scrollbar flex-1 p-4 sm:p-5 space-y-4">
+        <div className="overflow-y-auto custom-scrollbar flex-1 p-4 sm:p-5 space-y-3.5">
           
           {/* Main Hero: Thought/Note Bubble & Identity */}
           <div className="space-y-3 pt-1">
@@ -229,10 +230,99 @@ export default function StatusDetailModal({
 
           </div>
 
+          {/* ─────────────────────────────────────────────────────────────
+              REPLIES & CHEERS STREAM (Visible to both author & partner)
+             ───────────────────────────────────────────────────────────── */}
+          <div className="pt-2.5 border-t border-[#E2D7C7] space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
+              <span className="flex items-center gap-1.5">
+                <MessageCircleHeart className="w-3.5 h-3.5 text-[#A83232]" />
+                <span>Sweet Replies & Cheers</span>
+              </span>
+              {allCheers.length > 0 && (
+                <span className="text-[10px] bg-[#FAF5EC] text-[#A83232] border border-[#D4AF37]/50 px-2 py-0.2 rounded-full font-bold shadow-2xs">
+                  {allCheers.length} {allCheers.length === 1 ? 'reply' : 'replies'}
+                </span>
+              )}
+            </div>
+
+            {allCheers.length > 0 ? (
+              <div className="space-y-2 max-h-44 overflow-y-auto custom-scrollbar pr-0.5">
+                {allCheers.map((cheer, idx) => {
+                  const isFromMe = cheer.fromId === currentUserId;
+                  const senderName = isFromMe ? 'You' : (getNickname(cheer.fromName) || partnerName);
+                  return (
+                    <div 
+                      key={cheer.atIso || idx}
+                      className={`p-2.5 rounded-2xl text-xs transition-all ${
+                        isFromMe 
+                          ? 'bg-[#FFF9EE] border border-[#D4AF37]/50 shadow-2xs ml-3' 
+                          : 'bg-white border border-[#E2D7C7] shadow-2xs mr-3'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5 mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                          isFromMe ? 'text-[#A83232]' : 'text-[#7A6855]'
+                        }`}>
+                          <span>💬</span>
+                          <span>{senderName}</span>
+                        </span>
+                        {cheer.atIso && (
+                          <span className="text-[9px] text-[#9E8B75]">
+                            {getTimeAgo(cheer.atIso)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[#36271C] font-medium leading-relaxed break-words text-xs">
+                        "{cheer.text}"
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-[#FAF5EC]/70 border border-dashed border-[#D2C3B0] rounded-2xl p-2.5 text-center space-y-0.5">
+                <p className="text-[11px] font-semibold text-[#7A6855]">
+                  No replies to this note yet
+                </p>
+                <p className="text-[10px] text-[#9E8B75]">
+                  {!isMine 
+                    ? `Send ${targetName} a sweet reply or cheer below 💕` 
+                    : `Waiting for a sweet reply from ${partnerName} 💕`}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Quick Reaction Bar & Custom Reply (For Partner's Note) */}
           {!isMine ? (
-            <div className="pt-3 border-t border-[#E2D7C7] space-y-3">
+            <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
               
+              {/* Quick Cheer Suggestion Pills */}
+              {contextualCheers && contextualCheers.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#9E8B75]">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
+                      <span>Quick Cheers</span>
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                    {contextualCheers.slice(0, 6).map((presetCheer, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSendCheer(presetCheer)}
+                        className="shrink-0 bg-white hover:bg-[#FAF5EC] active:scale-95 border border-[#E2D7C7] hover:border-[#D4AF37] text-[#36271C] text-[11px] font-medium px-2.5 py-1 rounded-full shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+                        title={`Send "${presetCheer}"`}
+                      >
+                        {presetCheer}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Quick Reactions Header & Buttons */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
@@ -331,7 +421,32 @@ export default function StatusDetailModal({
 
             </div>
           ) : (
-            <div className="pt-2 border-t border-[#E2D7C7]">
+            <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
+              {/* Partner Reactions Summary for Author */}
+              {totalPartnerReactions > 0 && (
+                <div className="p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#D4AF37]/40 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#9E8B75] flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
+                    <span>Reactions from {partnerName}</span>
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {Object.entries(targetStatus.reactions || {}).map(([emoji, data]) => {
+                      const count = Number(data?.count) || 0;
+                      if (count <= 0) return null;
+                      return (
+                        <span 
+                          key={emoji}
+                          className="inline-flex items-center gap-1 bg-white border border-[#E2D7C7] px-2 py-0.5 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
+                        >
+                          <span>{emoji}</span>
+                          <span className="text-[10px] text-[#A83232] font-mono font-bold">x{count}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={() => {

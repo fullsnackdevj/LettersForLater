@@ -124,7 +124,7 @@ export default function CoupleStatusBanner({
                     <p className="text-[10px] text-[#A83232] font-semibold flex items-center gap-1 truncate -mt-0.5">
                       <span>💬</span>
                       <span className="truncate">
-                        {partnerStatus.lastCheer.fromId === currentUserId ? 'You:' : `${partnerName}:`} "{partnerStatus.lastCheer.text}"
+                        {partnerStatus.lastCheer.fromId === currentUserId ? 'You:' : `${getNickname(partnerStatus.lastCheer.fromName) || partnerName}:`} "{partnerStatus.lastCheer.text}"
                       </span>
                     </p>
                   ) : partnerStatus?.customNote ? (
@@ -191,7 +191,7 @@ export default function CoupleStatusBanner({
                       </span>
                     )}
                     {myStatusSeen && (
-                      <span className="text-[8px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded-full font-medium hidden sm:inline-block">
+                      <span className="text-[8px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded-full font-medium inline-block">
                         Seen 💕
                       </span>
                     )}
@@ -201,11 +201,11 @@ export default function CoupleStatusBanner({
                     {myStatus?.statusText || '+ Tap to set your mood or activity'}
                   </p>
 
-                  {myStatus?.lastCheer && myStatus.lastCheer.fromId !== currentUserId ? (
+                  {myStatus?.lastCheer ? (
                     <p className="text-[10px] text-[#A83232] font-semibold flex items-center gap-1 truncate -mt-0.5">
                       <span>💬</span>
                       <span className="truncate">
-                        {partnerName}: "{myStatus.lastCheer.text}"
+                        {myStatus.lastCheer.fromId === currentUserId ? 'You:' : `${getNickname(myStatus.lastCheer.fromName) || partnerName}:`} "{myStatus.lastCheer.text}"
                       </span>
                     </p>
                   ) : myStatus?.customNote ? (

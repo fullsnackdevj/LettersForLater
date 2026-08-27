@@ -867,7 +867,7 @@ export default function App() {
           setIsStatusDetailOpen(false);
           setSelectedStatusForDetail(null);
         }}
-        targetStatus={selectedStatusForDetail}
+        targetStatus={selectedStatusForDetail?.userId ? (statuses[selectedStatusForDetail.userId] || selectedStatusForDetail) : selectedStatusForDetail}
         currentUser={user}
         pairInfo={pairInfo}
         onReactToStatus={handleReactToStatus}
