@@ -49,26 +49,32 @@ export default function VaultView({
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
   const currentUserId = currentUser?.uid || 'demo-user-1';
 
-  // Separate user and partner letters
+  // Separate user and partner letters (exclude drafts from waiting count)
   const myLetters = letters.filter(l => l.authorId === currentUserId);
-  const partnerLetters = letters.filter(l => l.authorId !== currentUserId);
+  const partnerLetters = letters.filter(l => l.authorId !== currentUserId && !l.isDraft);
 
-  // 1. Track Seen Partner Letters
-  const [lastSeenPartnerLetters, setLastSeenPartnerLetters] = useState(() => {
+  // 1. Track Seen Partner Letters (Timestamp-based to prevent false-positive notifications on historical letters)
+  const [lastSeenPartnerLetterTime, setLastSeenPartnerLetterTime] = useState(() => {
     try {
-      const stored = localStorage.getItem(`lfl_seen_partner_letters_${currentUserId}`);
-      return stored !== null ? Number(stored) : partnerLetters.length;
+      const stored = localStorage.getItem(`lfl_seen_partner_letters_time_${currentUserId}`);
+      return stored !== null ? Number(stored) : Date.now();
     } catch (e) {
-      return partnerLetters.length;
+      return Date.now();
     }
   });
 
-  const hasNewPartnerLetters = partnerLetters.length > lastSeenPartnerLetters;
+  const hasNewPartnerLetters = useMemo(() => {
+    return partnerLetters.some(l => {
+      const createdTime = new Date(l.createdAtIso || l.createdAtPHT || 0).getTime();
+      return createdTime > lastSeenPartnerLetterTime;
+    });
+  }, [partnerLetters, lastSeenPartnerLetterTime]);
 
   const handlePartnerLettersClick = () => {
     try {
-      localStorage.setItem(`lfl_seen_partner_letters_${currentUserId}`, partnerLetters.length);
-      setLastSeenPartnerLetters(partnerLetters.length);
+      const now = Date.now();
+      localStorage.setItem(`lfl_seen_partner_letters_time_${currentUserId}`, now);
+      setLastSeenPartnerLetterTime(now);
     } catch (e) {}
   };
 
