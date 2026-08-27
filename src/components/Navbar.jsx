@@ -10,7 +10,9 @@ import {
   Plus,
   Menu,
   X,
-  Eye
+  Eye,
+  Video,
+  Phone
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -32,7 +34,8 @@ export default function Navbar({
   onOpenStoryIntro,
   onOpenStatusPicker,
   onOpenStatusDetail,
-  onOpenBucketList
+  onOpenBucketList,
+  onOpenCallPrompt
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));
@@ -97,11 +100,11 @@ export default function Navbar({
           <div className="wax-seal w-9 h-9 sm:w-10 sm:h-10 text-base sm:text-lg font-serif font-bold cursor-pointer hover:scale-105 transition-transform shrink-0">
             L
           </div>
-          <div>
+          <div className="hidden md:block">
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold font-serif-vintage tracking-tight text-[#36271C]">
               LettersForLater
             </h1>
-            <p className="text-[11px] text-[#9E8B75] hidden md:block font-handwriting text-base -mt-1">
+            <p className="text-[11px] text-[#9E8B75] font-handwriting text-base -mt-1">
               keeping our memories until the right time
             </p>
           </div>
@@ -245,6 +248,22 @@ export default function Navbar({
               </button>
             </div>
 
+            {/* Call Partner Button */}
+            {onOpenCallPrompt && (
+              <div className="relative group shrink-0">
+                <button
+                  type="button"
+                  onClick={onOpenCallPrompt}
+                  className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-[#D4AF37] hover:border-[#A83232] cursor-pointer"
+                  title={`Call ${partnerName} (Video or Voice)`}
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-[#A83232] to-[#8B0000] hover:brightness-110 border border-white flex items-center justify-center text-[#F8E3B6] transition-all shadow-xs">
+                    <Video className="w-4 h-4 text-[#F8E3B6]" />
+                  </div>
+                </button>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -363,6 +382,21 @@ export default function Navbar({
                       </div>
                     </div>
 
+                    {/* Call Partner in Profile Menu */}
+                    {onOpenCallPrompt && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          onOpenCallPrompt();
+                        }}
+                        className="w-full mt-2.5 flex items-center justify-center gap-2 py-2 px-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                      >
+                        <Video className="w-3.5 h-3.5 text-[#F8E3B6]" />
+                        <span>Call {partnerName}</span>
+                      </button>
+                    )}
+
                     {/* How It Works & App Guide in Profile */}
                     <button
                       type="button"
@@ -370,7 +404,7 @@ export default function Navbar({
                         setIsProfileOpen(false);
                         onOpenInfo();
                       }}
-                      className="w-full mt-2.5 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
                     >
                       <HelpCircle className="w-3.5 h-3.5 text-[#A83232]" />
                       <span>How It Works & Info</span>

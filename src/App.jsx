@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from './components/Navbar';
 import MusicPlayer from './components/MusicPlayer';
 import VaultView from './components/VaultView';
@@ -20,7 +20,21 @@ import StatusDetailModal from './components/StatusDetailModal';
 import CoupleStatusBanner from './components/CoupleStatusBanner';
 import BucketListModal from './components/BucketListModal';
 import DailyPrayerModal from './components/DailyPrayerModal';
+import CallPromptModal from './components/CallPromptModal';
+import CallModal from './components/CallModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
+
+import { 
+  listenForIncomingCalls, 
+  startOutgoingCall, 
+  acceptIncomingCall, 
+  terminateCall, 
+  sendCallReaction, 
+  getLocalUserMedia, 
+  switchCameraTrack, 
+  stopMediaStream,
+  ringtonePlayer
+} from './services/webrtc';
 
 import { 
   signInWithGoogle, 
@@ -53,6 +67,7 @@ import {
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
+import { getNickname } from './utils/nicknames';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -109,6 +124,17 @@ export default function App() {
   const [isPrayersOpen, setIsPrayersOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
+
+  // Video / Audio Calling State
+  const [isCallPromptOpen, setIsCallPromptOpen] = useState(false);
+  const [activeCallData, setActiveCallData] = useState(null);
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
+  const [localMediaStream, setLocalMediaStream] = useState(null);
+  const [remoteMediaStream, setRemoteMediaStream] = useState(null);
+  const [callFacingMode, setCallFacingMode] = useState('user');
+  const activeCallCleanupRef = useRef(null);
+  const localStreamRef = useRef(null);
 
   // Subscribe to Auth State & auto-manage Auth Modal
   useEffect(() => {
@@ -202,6 +228,182 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
+
+  // Helper to cleanup active call streams and reset state
+  const handleCleanUpCall = useCallback(() => {
+    ringtonePlayer.stop();
+    if (activeCallCleanupRef.current) {
+      try {
+        activeCallCleanupRef.current();
+      } catch (e) {}
+      activeCallCleanupRef.current = null;
+    }
+    if (localStreamRef.current) {
+      stopMediaStream(localStreamRef.current);
+      localStreamRef.current = null;
+    }
+    setLocalMediaStream(null);
+    setRemoteMediaStream(null);
+    setIsCallModalOpen(false);
+    setIsCallMinimized(false);
+    setActiveCallData(null);
+  }, []);
+
+  const activeCallCleanupCallbackRef = useRef(handleCleanUpCall);
+  activeCallCleanupCallbackRef.current = handleCleanUpCall;
+
+  // Subscribe to Realtime Incoming & Active Calls
+  useEffect(() => {
+    if (!user || !isAppUnlocked) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user.uid || 'demo-user-1';
+
+    const unsubscribe = listenForIncomingCalls(pairCode, currentUserId, (callData) => {
+      if (!callData) {
+        ringtonePlayer.stop();
+        return;
+      }
+
+      setActiveCallData(callData);
+
+      // Case A: Incoming Call Ringing
+      if (callData.status === 'ringing' && callData.receiver?.uid === currentUserId) {
+        setIsCallModalOpen(true);
+        setIsCallMinimized(false);
+        ringtonePlayer.playIncomingChime();
+      }
+
+      // Case B: Outgoing Call Connected
+      if (callData.status === 'connected') {
+        ringtonePlayer.stop();
+        setIsCallModalOpen(true);
+      }
+
+      // Case C: Call Rejected or Ended
+      if (callData.status === 'ended' || callData.status === 'rejected' || callData.status === 'busy') {
+        ringtonePlayer.stop();
+        setTimeout(() => {
+          if (activeCallCleanupCallbackRef.current) {
+            activeCallCleanupCallbackRef.current();
+          }
+        }, 1200);
+      }
+    });
+
+    return () => {
+      ringtonePlayer.stop();
+      unsubscribe();
+    };
+  }, [user?.uid, isAppUnlocked, pairInfo?.code]);
+
+  const handleStartCall = useCallback(async (callType = 'video') => {
+    if (!user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user.uid || 'demo-user-1';
+    const partnerStatus = Object.values(statuses || {}).find(s => s.userId !== currentUserId);
+    const partnerUser = {
+      uid: partnerStatus?.userId || 'partner-id',
+      name: getNickname(pairInfo?.user2?.name) || 'Partner',
+      photo: partnerStatus?.userPhoto || pairInfo?.user2?.photo || ''
+    };
+
+    setIsCallPromptOpen(false);
+    setIsCallModalOpen(true);
+    setIsCallMinimized(false);
+    ringtonePlayer.playOutgoingRingback();
+
+    try {
+      const stream = await getLocalUserMedia(callType, 'user');
+      localStreamRef.current = stream;
+      setLocalMediaStream(stream);
+
+      const { cleanup } = await startOutgoingCall({
+        pairCode,
+        callerUser: user,
+        receiverUser: partnerUser,
+        callType,
+        localStream: stream,
+        onRemoteStream: (rStream) => {
+          setRemoteMediaStream(rStream);
+        },
+        onCallStateChange: (updatedCall) => {
+          setActiveCallData(updatedCall);
+          if (updatedCall?.status === 'connected') {
+            ringtonePlayer.stop();
+          } else if (updatedCall?.status === 'ended' || updatedCall?.status === 'rejected') {
+            ringtonePlayer.stop();
+            setTimeout(() => handleCleanUpCall(), 1200);
+          }
+        }
+      });
+
+      activeCallCleanupRef.current = cleanup;
+    } catch (err) {
+      console.error('Error starting outgoing call:', err);
+      ringtonePlayer.stop();
+      handleCleanUpCall();
+    }
+  }, [user, pairInfo, statuses, handleCleanUpCall]);
+
+  const handleAcceptCall = useCallback(async () => {
+    if (!user || !activeCallData) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    ringtonePlayer.stop();
+
+    try {
+      const stream = await getLocalUserMedia(activeCallData.callType || 'video', 'user');
+      localStreamRef.current = stream;
+      setLocalMediaStream(stream);
+
+      const { cleanup } = await acceptIncomingCall({
+        pairCode,
+        callData: activeCallData,
+        localStream: stream,
+        onRemoteStream: (rStream) => {
+          setRemoteMediaStream(rStream);
+        },
+        onCallStateChange: (updatedCall) => {
+          setActiveCallData(updatedCall);
+          if (updatedCall?.status === 'ended' || updatedCall?.status === 'rejected') {
+            ringtonePlayer.stop();
+            setTimeout(() => handleCleanUpCall(), 1200);
+          }
+        }
+      });
+
+      activeCallCleanupRef.current = cleanup;
+    } catch (err) {
+      console.error('Error accepting call:', err);
+      handleCleanUpCall();
+    }
+  }, [user, activeCallData, pairInfo?.code, handleCleanUpCall]);
+
+  const handleDeclineCall = useCallback(async () => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await terminateCall(pairCode, 'rejected');
+    handleCleanUpCall();
+  }, [pairInfo?.code, handleCleanUpCall]);
+
+  const handleEndCall = useCallback(async () => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await terminateCall(pairCode, 'ended');
+    handleCleanUpCall();
+  }, [pairInfo?.code, handleCleanUpCall]);
+
+  const handleSendCallReaction = useCallback((emoji) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUserId = user?.uid || 'demo-user-1';
+    sendCallReaction(pairCode, emoji, currentUserId);
+  }, [pairInfo?.code, user?.uid]);
+
+  const handleSwitchCamera = useCallback(async (currentMode) => {
+    if (localStreamRef.current) {
+      const newMode = await switchCameraTrack(localStreamRef.current, currentMode);
+      setCallFacingMode(newMode);
+      return newMode;
+    }
+    return currentMode;
+  }, []);
 
   const countdown = getCountdownToTarget(pairInfo?.targetUnlockDate);
 
@@ -627,7 +829,7 @@ export default function App() {
         <MusicPlayer />
       )}
 
-      {/* Top Navbar with integrated Our Stories */}
+      {/* Top Navbar with integrated Our Stories & Call Partner */}
       <Navbar
         user={user}
         pairInfo={pairInfo}
@@ -647,6 +849,7 @@ export default function App() {
         onOpenStoryArchive={() => setIsStoryArchiveOpen(true)}
         onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
         onOpenBucketList={() => setIsBucketListOpen(true)}
+        onOpenCallPrompt={() => setIsCallPromptOpen(true)}
       />
 
       {/* Couple Live Status Ribbon ("What We're Currently Doing") */}
@@ -660,6 +863,7 @@ export default function App() {
             setSelectedStatusForDetail(statusDoc);
             setIsStatusDetailOpen(true);
           }}
+          onOpenCallPrompt={() => setIsCallPromptOpen(true)}
         />
       )}
 
@@ -877,6 +1081,7 @@ export default function App() {
           setIsStatusDetailOpen(false);
           setIsStatusPickerOpen(true);
         }}
+        onOpenCallPrompt={() => setIsCallPromptOpen(true)}
       />
 
       {/* Our Fantasy / Bucket List Note Modal */}
@@ -912,6 +1117,34 @@ export default function App() {
       <InfoModal
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
+      />
+
+      {/* Call Prompt Selection Dialog (Video vs Voice Call) */}
+      <CallPromptModal
+        isOpen={isCallPromptOpen}
+        onClose={() => setIsCallPromptOpen(false)}
+        partner={{
+          name: getNickname(pairInfo?.user2?.name) || 'Partner',
+          photo: Object.values(statuses || {}).find(s => s.userId !== (user?.uid || 'demo-user-1'))?.userPhoto || pairInfo?.user2?.photo || ''
+        }}
+        onStartCall={handleStartCall}
+      />
+
+      {/* Active WebRTC Video & Audio Call Modal / Floating PIP */}
+      <CallModal
+        isOpen={isCallModalOpen}
+        callData={activeCallData}
+        currentUserId={user?.uid || 'demo-user-1'}
+        localStream={localMediaStream}
+        remoteStream={remoteMediaStream}
+        isMinimized={isCallMinimized}
+        onToggleMinimize={() => setIsCallMinimized(!isCallMinimized)}
+        onAccept={handleAcceptCall}
+        onDecline={handleDeclineCall}
+        onEndCall={handleEndCall}
+        onSendReaction={handleSendCallReaction}
+        onSwitchCamera={handleSwitchCamera}
+        facingMode={callFacingMode}
       />
 
       {/* Floating Jay Companion */}

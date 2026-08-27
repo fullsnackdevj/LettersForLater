@@ -2,7 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { 
   Edit3, 
   Eye, 
-  MessageCircleHeart 
+  MessageCircleHeart,
+  Video
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 
@@ -11,7 +12,8 @@ export default function CoupleStatusBanner({
   pairInfo,
   statuses = {},
   onOpenStatusPicker,
-  onOpenStatusDetail
+  onOpenStatusDetail,
+  onOpenCallPrompt
 }) {
   if (!user) return null;
 
@@ -136,8 +138,22 @@ export default function CoupleStatusBanner({
 
               </div>
 
-              {/* Compact Right Action Button */}
-              <div className="shrink-0 flex items-center">
+              {/* Compact Right Action Buttons */}
+              <div className="shrink-0 flex items-center gap-1.5">
+                {onOpenCallPrompt && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCallPrompt();
+                    }}
+                    className="p-1.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#A83232] transition-all flex items-center justify-center cursor-pointer group-hover:scale-105 active:scale-95 shadow-2xs"
+                    title={`Call ${partnerName}`}
+                  >
+                    <Video className="w-3.5 h-3.5 text-[#A83232]" />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={(e) => {

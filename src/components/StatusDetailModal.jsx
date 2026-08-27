@@ -7,7 +7,8 @@ import {
   Check, 
   Sparkles, 
   Send,
-  MessageCircleHeart
+  MessageCircleHeart,
+  Video
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { getCheersForStatus } from '../data/statusPresets';
@@ -23,7 +24,8 @@ export default function StatusDetailModal({
   onReactToStatus,
   onSendCheer,
   onMarkStatusAsViewed,
-  onOpenStatusPicker
+  onOpenStatusPicker,
+  onOpenCallPrompt
 }) {
   const [floatingParticles, setFloatingParticles] = useState([]);
   const [sentCheer, setSentCheer] = useState(null);
@@ -327,7 +329,23 @@ export default function StatusDetailModal({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
                   <span>Tap to React 💕</span>
-                  <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
+                  <div className="flex items-center gap-2">
+                    {onOpenCallPrompt && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenCallPrompt();
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] text-[#A83232] bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D4AF37]/50 px-2 py-0.5 rounded-full font-bold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                        title={`Call ${partnerName}`}
+                      >
+                        <Video className="w-2.5 h-2.5 text-[#A83232]" />
+                        <span>Call</span>
+                      </button>
+                    )}
+                    <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
