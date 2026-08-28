@@ -8,17 +8,20 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
+import { getPresenceInfo } from '../utils/presence';
 
 export default function CallPromptModal({
   isOpen,
   onClose,
   partner,
+  partnerPresence,
   onStartCall
 }) {
   if (!isOpen) return null;
 
   const partnerName = getNickname(partner?.name) || 'Partner';
   const partnerPhoto = partner?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+  const presenceInfo = getPresenceInfo(partnerPresence);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -38,25 +41,45 @@ export default function CallPromptModal({
         </button>
 
         {/* Partner Avatar & Header */}
-        <div className="text-center space-y-2.5 pt-2">
+        <div className="text-center space-y-2 pt-2">
           <div className="relative inline-block">
             <img
               src={partnerPhoto}
               alt={partnerName}
               className="w-20 h-20 rounded-full object-cover border-3 border-[#D4AF37] shadow-md mx-auto"
             />
-            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#A83232] text-white flex items-center justify-center border-2 border-white shadow-xs">
-              <Heart className="w-3 h-3 fill-current text-[#F8E3B6]" />
-            </span>
+            {/* Live Presence Dot on Avatar */}
+            {presenceInfo.isOnline ? (
+              <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-white"></span>
+              </span>
+            ) : (
+              <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-stone-400 text-white flex items-center justify-center border-2 border-white shadow-xs">
+                <span className="w-2.5 h-2.5 rounded-full bg-white/80"></span>
+              </span>
+            )}
           </div>
 
           <div>
             <h3 className="font-serif-vintage font-bold text-xl text-[#36271C]">
               Call {partnerName}
             </h3>
-            <p className="text-xs text-[#7A6855] font-handwriting text-base -mt-0.5">
-              Connect privately & securely with your love
-            </p>
+            
+            {/* Live Presence Pill */}
+            <div className="mt-1 flex items-center justify-center">
+              {presenceInfo.isOnline ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Online on the app 💕</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-stone-100 border border-stone-200 text-stone-600 text-[11px] font-medium">
+                  <span className="w-2 h-2 rounded-full bg-stone-400"></span>
+                  <span>{presenceInfo.detailText}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -108,8 +131,18 @@ export default function CallPromptModal({
 
         </div>
 
+        {/* Offline Friendly Note */}
+        {!presenceInfo.isOnline && (
+          <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+            <span className="leading-tight">
+              {partnerName} is not active on the app right now. She will hear your call as soon as she opens LettersForLater!
+            </span>
+          </div>
+        )}
+
         {/* Security & Privacy Badge */}
-        <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#9E8B75] pt-1">
+        <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#9E8B75] pt-0.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
           <span>Encrypted Peer-to-Peer • 100% Private</span>
         </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
+import { getPresenceInfo } from '../utils/presence';
 
 export default function Navbar({ 
   user, 
@@ -23,6 +24,7 @@ export default function Navbar({
   isLettersUnlocked,
   stories = [],
   statuses = {},
+  partnerPresence,
   hasSeenStoriesIntro = false,
   onOpenAuth, 
   onOpenPairing, 
@@ -91,6 +93,8 @@ export default function Navbar({
     !(s.viewedBy || []).some(id => id !== currentUserId)
   );
 
+  const partnerPresenceInfo = getPresenceInfo(partnerPresence);
+
   return (
     <header className="sticky top-0 z-40 bg-[#F6F2EB]/95 backdrop-blur-md border-b border-[#E2D7C7] px-3 sm:px-4 lg:px-8 py-2 sm:py-2.5 transition-all shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
@@ -118,11 +122,11 @@ export default function Navbar({
             
             {/* Story Hub Title Label (Desktop) */}
             <div className="hidden xl:flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#A83232] pr-1.5 border-r border-[#D2C3B0]/60">
-              <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-              <span>Our Stories</span>
+              <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Stories</span>
             </div>
 
-            {/* Jay / Current User Story Avatar Ring */}
+            {/* Your Story Avatar Ring + Plus Trigger */}
             <div className="relative group shrink-0">
               <button
                 type="button"
@@ -133,10 +137,10 @@ export default function Navbar({
                     onOpenStoryCreator();
                   }
                 }}
-                className={`relative rounded-full transition-all group-hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer p-[2px] ${
+                className={`relative rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center p-[2px] cursor-pointer ${
                   myActiveStories.length > 0 
-                    ? myHasUnseen
-                      ? 'story-ring-glow animate-story-pulse'
+                    ? myHasUnseenByPartner 
+                      ? 'story-ring-glow animate-story-pulse' 
                       : 'border-2 border-[#D2C3B0]'
                     : 'border-2 border-dashed border-[#D2C3B0]/70'
                 }`}
@@ -208,9 +212,9 @@ export default function Navbar({
                 title={
                   partnerActiveStories.length > 0 
                     ? partnerHasUnseen 
-                      ? `✨ ${partnerName} posted a new story! (Tap to view)` 
-                      : `View ${partnerName}'s Story`
-                    : `${partnerName} has not posted a story today yet`
+                      ? `✨ ${partnerName} posted a new story! (${partnerPresenceInfo.detailText})` 
+                      : `View ${partnerName}'s Story (${partnerPresenceInfo.detailText})`
+                    : `${partnerName}: ${partnerPresenceInfo.detailText}`
                 }
               >
                 {partnerPhoto ? (
@@ -225,6 +229,24 @@ export default function Navbar({
                   </div>
                 )}
               </button>
+
+              {/* Partner Live Online Presence Dot */}
+              <div 
+                className="absolute -top-0.5 -right-0.5 z-30 pointer-events-none"
+                title={`${partnerName}: ${partnerPresenceInfo.detailText}`}
+              >
+                {partnerPresenceInfo.isOnline ? (
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white shadow-xs"></span>
+                  </span>
+                ) : (
+                  <span 
+                    className="inline-flex rounded-full h-2.5 w-2.5 bg-stone-400/90 border border-white shadow-2xs" 
+                    title={`${partnerName}: ${partnerPresenceInfo.detailText}`}
+                  />
+                )}
+              </div>
 
               {/* Partner No Story Mini Popup / Tooltip */}
               {partnerNoStoryToast && (
@@ -255,10 +277,13 @@ export default function Navbar({
                   type="button"
                   onClick={onOpenCallPrompt}
                   className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-[#D4AF37] hover:border-[#A83232] cursor-pointer"
-                  title={`Call ${partnerName} (Video or Voice)`}
+                  title={`Call ${partnerName} • ${partnerPresenceInfo.badgeText}`}
                 >
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-[#A83232] to-[#8B0000] hover:brightness-110 border border-white flex items-center justify-center text-[#F8E3B6] transition-all shadow-xs">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-[#A83232] to-[#8B0000] hover:brightness-110 border border-white flex items-center justify-center text-[#F8E3B6] transition-all shadow-xs relative">
                     <Video className="w-4 h-4 text-[#F8E3B6]" />
+                    {partnerPresenceInfo.isOnline && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border border-white shadow-2xs" />
+                    )}
                   </div>
                 </button>
               </div>

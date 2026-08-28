@@ -63,7 +63,10 @@ import {
   savePrayerRequest,
   markPrayerAsPrayed,
   deletePrayerRequest,
-  subscribeToPrayerRequests
+  subscribeToPrayerRequests,
+  updatePresenceHeartbeat,
+  setPresenceOffline,
+  subscribeToPresence
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -79,6 +82,7 @@ export default function App() {
   const [letters, setLetters] = useState([]);
   const [stories, setStories] = useState([]);
   const [bucketItems, setBucketItems] = useState([]);
+  const [presences, setPresences] = useState({});
 
   // App Startup Gatekeeper Lock State
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
@@ -228,6 +232,55 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Presence Map ("Who is Online")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToPresence(pairCode, (presencesMap) => {
+      setPresences(presencesMap || {});
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Send Active Presence Heartbeat while user is active on the app
+  useEffect(() => {
+    if (!user || !isAppUnlocked) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+
+    // 1. Immediate Heartbeat on App Open/Unlock
+    updatePresenceHeartbeat(pairCode, user, true);
+
+    // 2. Periodic Heartbeat every 25 seconds
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        updatePresenceHeartbeat(pairCode, user, true);
+      }
+    }, 25000);
+
+    // 3. Tab Visibility Switch Handler
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updatePresenceHeartbeat(pairCode, user, true);
+      } else {
+        updatePresenceHeartbeat(pairCode, user, false);
+      }
+    };
+
+    // 4. Window Close / Refresh Handler
+    const handleBeforeUnload = () => {
+      setPresenceOffline(pairCode, user);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      setPresenceOffline(pairCode, user);
+    };
+  }, [user, isAppUnlocked, pairInfo?.code]);
 
   // Helper to cleanup active call streams and reset state
   const handleCleanUpCall = useCallback(() => {
@@ -821,12 +874,15 @@ export default function App() {
     }
   };
 
+  const currentUserId = user?.uid || 'demo-user-1';
+  const partnerPresence = Object.values(presences || {}).find(p => p.userId !== currentUserId);
+
   return (
     <div className="min-h-screen flex flex-col font-sans">
       
       {/* Very Top Background Music Player — Only active AFTER successful login & app unlock */}
       {user && isAppUnlocked && !isAuthOpen && (
-        <MusicPlayer />
+        <MusicPlayer isCallActive={isCallModalOpen} />
       )}
 
       {/* Top Navbar with integrated Our Stories & Call Partner */}
@@ -835,6 +891,8 @@ export default function App() {
         pairInfo={pairInfo}
         isLettersUnlocked={isLettersUnlocked}
         stories={stories}
+        statuses={statuses}
+        partnerPresence={partnerPresence}
         hasSeenStoriesIntro={hasSeenStoriesIntro}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
@@ -858,6 +916,7 @@ export default function App() {
           user={user}
           pairInfo={pairInfo}
           statuses={statuses}
+          partnerPresence={partnerPresence}
           onOpenStatusPicker={() => setIsStatusPickerOpen(true)}
           onOpenStatusDetail={(statusDoc) => {
             setSelectedStatusForDetail(statusDoc);
@@ -1127,6 +1186,7 @@ export default function App() {
           name: getNickname(pairInfo?.user2?.name) || 'Partner',
           photo: Object.values(statuses || {}).find(s => s.userId !== (user?.uid || 'demo-user-1'))?.userPhoto || pairInfo?.user2?.photo || ''
         }}
+        partnerPresence={partnerPresence}
         onStartCall={handleStartCall}
       />
 

@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import { DEFAULT_PLAYLIST } from '../data/playlist';
 
-export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
+export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive = false }) {
   const audioRef = useRef(null);
+  const wasPlayingBeforeCallRef = useRef(false);
   
   // Track Index with LocalStorage Persistence
   const [currentTrackIndex, setCurrentTrackIndex] = useState(() => {
@@ -55,6 +56,29 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
     } catch {}
   }, [currentTrackIndex]);
 
+  // Auto-pause music during an active call, resume when call ends
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isCallActive) {
+      // Call started — remember if music was playing, then pause
+      wasPlayingBeforeCallRef.current = isPlaying;
+      if (isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    } else {
+      // Call ended — resume if music was playing before
+      if (wasPlayingBeforeCallRef.current) {
+        audio.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {});
+        wasPlayingBeforeCallRef.current = false;
+      }
+    }
+  }, [isCallActive]);
+
   // Attempt Autoplay / Track Change Playback
   useEffect(() => {
     const audio = audioRef.current;
@@ -64,6 +88,7 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
     audio.load();
 
     const attemptPlay = async () => {
+      if (isCallActive) return; // Don't autoplay during a call
       try {
         await audio.play();
         setIsPlaying(true);
@@ -79,6 +104,7 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST }) {
 
     // Global first-click handler to unlock audio if blocked
     const handleFirstUserInteraction = () => {
+      if (isCallActive) return; // Don't auto-unlock during a call
       if (audioRef.current && audioRef.current.paused) {
         audioRef.current.play().then(() => {
           setIsPlaying(true);

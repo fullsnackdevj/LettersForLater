@@ -6,11 +6,13 @@ import {
   Video
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
+import { getPresenceInfo } from '../utils/presence';
 
 export default function CoupleStatusBanner({
   user,
   pairInfo,
   statuses = {},
+  partnerPresence,
   onOpenStatusPicker,
   onOpenStatusDetail,
   onOpenCallPrompt
@@ -106,11 +108,22 @@ export default function CoupleStatusBanner({
                     <span className="text-[9px] sm:text-[10px] font-bold text-[#A83232] uppercase tracking-wider truncate">
                       {partnerName}'s Live Note
                     </span>
-                    {partnerStatus?.updatedAtIso && (
-                      <span className="text-[9px] text-[#9E8B75] shrink-0">
-                        • {getTimeAgo(partnerStatus.updatedAtIso)}
-                      </span>
-                    )}
+                    
+                    {/* Partner Presence Badge */}
+                    {(() => {
+                      const presenceInfo = getPresenceInfo(partnerPresence);
+                      return presenceInfo.isOnline ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>Active</span>
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-[#9E8B75] shrink-0">
+                          • {presenceInfo.badgeText}
+                        </span>
+                      );
+                    })()}
+
                     {isPartnerStatusUnseen && (
                       <span className="text-[8px] bg-[#A83232] text-[#F8E3B6] border border-[#D4AF37] px-1 py-0.2 rounded-full font-bold shadow-xs animate-bounce shrink-0">
                         NEW

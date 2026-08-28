@@ -1431,5 +1431,98 @@ export function subscribeToPrayerRequests(pairCode, callback) {
   return () => clearInterval(pollInterval);
 }
 
+// ─────────────────────────────────────────────────────────────
+// COUPLE PRESENCE & LIVE ONLINE HEARTBEAT
+// ─────────────────────────────────────────────────────────────
+const LOCAL_PRESENCE_KEY = 'lettersforlater_presence';
+
+export async function updatePresenceHeartbeat(pairCode, user, isOnline = true) {
+  if (!user) return;
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user.uid || 'demo-user-1';
+  const userName = user.displayName || 'Jay';
+  const userPhoto = user.photoURL || '';
+  const pht = getCurrentPHT();
+
+  const presenceData = {
+    userId,
+    userName,
+    userPhoto,
+    isOnline: Boolean(isOnline),
+    lastSeenIso: new Date().toISOString(),
+    lastSeenPHT: pht.fullString
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const presenceRef = doc(db, 'pairs', cleanCode, 'presence', userId);
+      await setDoc(presenceRef, {
+        ...presenceData,
+        serverTime: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Error updating presence:', err);
+    }
+    return presenceData;
+  }
+
+  // Local fallback
+  try {
+    const raw = localStorage.getItem(LOCAL_PRESENCE_KEY);
+    const local = raw ? JSON.parse(raw) : {};
+    const pairPresences = local[cleanCode] || {};
+    pairPresences[userId] = presenceData;
+    local[cleanCode] = pairPresences;
+    localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(local));
+  } catch (e) {}
+
+  return presenceData;
+}
+
+export async function setPresenceOffline(pairCode, user) {
+  return updatePresenceHeartbeat(pairCode, user, false);
+}
+
+export function subscribeToPresence(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const col = collection(db, 'pairs', cleanCode, 'presence');
+    return onSnapshot(col, (snapshot) => {
+      const presenceMap = {};
+      snapshot.forEach((docSnap) => {
+        presenceMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+      });
+      callback(presenceMap);
+    }, (err) => {
+      console.warn('Presence subscription warning:', err);
+    });
+  }
+
+  // Local fallback polling
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_PRESENCE_KEY) || '{}';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      try {
+        const local = JSON.parse(raw);
+        callback(local[cleanCode] || {});
+      } catch (e) {}
+    }
+  }, 2000);
+
+  try {
+    const raw = localStorage.getItem(LOCAL_PRESENCE_KEY) || '{}';
+    lastJson = raw;
+    const local = JSON.parse(raw);
+    callback(local[cleanCode] || {});
+  } catch (e) {
+    callback({});
+  }
+
+  return () => clearInterval(pollInterval);
+}
+
+
 
 
