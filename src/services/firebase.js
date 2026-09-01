@@ -11,6 +11,7 @@ import {
   deleteDoc, 
   query, 
   where, 
+  orderBy,
   onSnapshot,
   serverTimestamp,
   getDocs,
@@ -661,58 +662,32 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
 
   if (isFirebaseConfigured && db) {
     const storyRef = doc(db, 'pairs', cleanCode, 'stories', storyId);
-    
     try {
-      const updatedReactions = await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(storyRef);
-        if (!snap.exists()) return null;
-        
+      const snap = await getDoc(storyRef);
+      if (snap.exists()) {
         const data = snap.data();
-        // Guard: Author should not react to their own story
-        if (data.authorId === userId) {
-          return data.reactions || {};
-        }
+        if (data.authorId === userId) return data.reactions || {};
 
         const currentReactions = data.reactions || {};
-        const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
-        
-        const userCounts = { ...(emojiData.userCounts || {}) };
-        // Fallback: if userCounts wasn't initialized but user is in users list, initialize with count
-        if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
-          userCounts[userId] = emojiData.count;
-        }
-        const currentCountForUser = Number(userCounts[userId]) || 0;
-        
-        if (currentCountForUser >= 10) {
-          return currentReactions; // Max 10 reached for this user
-        }
-        
-        userCounts[userId] = currentCountForUser + 1;
-        const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-        
+        const emojiData = currentReactions[emoji] || { count: 0, users: [] };
         const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
-        if (!newUsers.includes(userId)) {
-          newUsers.push(userId);
-        }
-        
+        if (!newUsers.includes(userId)) newUsers.push(userId);
+
         const newReactions = {
           ...currentReactions,
           [emoji]: {
-            count: totalCount,
-            userCounts,
+            count: (emojiData.count || 0) + 1,
             users: newUsers,
             lastReactedBy: userName,
             lastReactedAt: timestamp
           }
         };
 
-        transaction.update(storyRef, { reactions: newReactions });
+        await updateDoc(storyRef, { reactions: newReactions });
         return newReactions;
-      });
-      
-      return updatedReactions;
+      }
     } catch (err) {
-      console.error('Transaction failed for reactToStory:', err);
+      console.error('Error in reactToStory:', err);
       return null;
     }
   }
@@ -721,32 +696,14 @@ export async function reactToStory(pairCode, storyId, user, emoji) {
   const localStories = getLocalStories();
   const story = localStories.find(s => s.id === storyId);
   if (story) {
-    // Guard: Author should not react to their own story
-    if (story.authorId === userId) {
-      return story.reactions || {};
-    }
-
+    if (story.authorId === userId) return story.reactions || {};
     story.reactions = story.reactions || {};
-    const emojiData = story.reactions[emoji] || { count: 0, userCounts: {}, users: [] };
-    const userCounts = { ...(emojiData.userCounts || {}) };
-    if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
-      userCounts[userId] = emojiData.count;
-    }
-    const currentCountForUser = Number(userCounts[userId]) || 0;
-    
-    if (currentCountForUser >= 10) {
-      return story.reactions;
-    }
-    
-    userCounts[userId] = currentCountForUser + 1;
-    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-    
+    const emojiData = story.reactions[emoji] || { count: 0, users: [] };
     const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
     if (!newUsers.includes(userId)) newUsers.push(userId);
-    
+
     story.reactions[emoji] = {
-      count: totalCount,
-      userCounts,
+      count: (emojiData.count || 0) + 1,
       users: newUsers,
       lastReactedBy: userName,
       lastReactedAt: timestamp
@@ -1524,6 +1481,278 @@ export function subscribeToPresence(pairCode, callback) {
   return () => clearInterval(pollInterval);
 }
 
+/**
+ * Couple Messenger / Chat Sanctuary Services
+ */
+const LOCAL_MESSAGES_KEY = 'lfl_couple_messages';
 
+function getLocalMessages() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_MESSAGES_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
 
+function saveLocalMessages(msgs) {
+  try {
+    localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(msgs));
+  } catch (e) {}
+}
 
+export async function sendChatMessage(pairCode, user, messageData) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Jay';
+  const userPhoto = user?.photoURL || '';
+  const pht = getCurrentPHT();
+  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Process photo if present as dataUrl
+  let processedMediaUrl = messageData.mediaUrl || '';
+  if (messageData.mediaDataUrl && isFirebaseConfigured && storage) {
+    try {
+      const fileName = `chat_${messageId}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `letters/${cleanCode}/chat/${fileName}`);
+      await uploadString(storageRef, messageData.mediaDataUrl, 'data_url');
+      processedMediaUrl = await getDownloadURL(storageRef);
+    } catch (err) {
+      console.error('Error uploading chat photo:', err);
+      processedMediaUrl = messageData.mediaDataUrl;
+    }
+  } else if (messageData.mediaDataUrl) {
+    processedMediaUrl = messageData.mediaDataUrl;
+  }
+
+  // Process audio if present
+  let processedAudio = null;
+  if (messageData.audioBlob && isFirebaseConfigured && storage) {
+    try {
+      const audioUrl = await uploadAudioToStorage(messageData.audioBlob, cleanCode, messageId);
+      processedAudio = {
+        storageUrl: audioUrl,
+        durationSec: messageData.durationSec || 0
+      };
+    } catch (err) {
+      console.error('Error uploading chat audio:', err);
+      processedAudio = {
+        storageUrl: messageData.audioDataUrl || '',
+        durationSec: messageData.durationSec || 0
+      };
+    }
+  } else if (messageData.audioDataUrl) {
+    processedAudio = {
+      storageUrl: messageData.audioDataUrl,
+      durationSec: messageData.durationSec || 0
+    };
+  } else if (messageData.audioNote) {
+    processedAudio = messageData.audioNote;
+  }
+
+  const messageDoc = {
+    id: messageId,
+    senderId: userId,
+    senderName: userName,
+    senderPhoto: userPhoto,
+    text: messageData.text || '',
+    mediaUrl: processedMediaUrl,
+    audioNote: processedAudio,
+    replyTo: messageData.replyTo || null,
+    reactions: {},
+    savedToVault: false,
+    createdAtIso: pht.isoString,
+    createdAtPHT: pht.fullString,
+    seenBy: [userId],
+    pairId: cleanCode
+  };
+
+  if (isFirebaseConfigured && db) {
+    const msgRef = doc(db, 'pairs', cleanCode, 'messages', messageId);
+    await setDoc(msgRef, {
+      ...messageDoc,
+      serverTime: serverTimestamp()
+    });
+    return messageDoc;
+  }
+
+  // Local fallback
+  const localList = getLocalMessages();
+  const updatedList = [...localList, messageDoc];
+  saveLocalMessages(updatedList);
+  return messageDoc;
+}
+
+export function subscribeToChatMessages(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const col = collection(db, 'pairs', cleanCode, 'messages');
+    const q = query(col, orderBy('createdAtIso', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+      const msgs = [];
+      snapshot.forEach((docSnap) => {
+        msgs.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(msgs);
+    }, (err) => {
+      console.warn('Chat messages subscription warning:', err);
+    });
+  }
+
+  // Local fallback polling
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_MESSAGES_KEY) || '[]';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      try {
+        const local = JSON.parse(raw);
+        callback(local);
+      } catch (e) {}
+    }
+  }, 1000);
+
+  const initial = getLocalMessages();
+  lastJson = localStorage.getItem(LOCAL_MESSAGES_KEY) || JSON.stringify(initial);
+  callback(initial);
+
+  return () => clearInterval(pollInterval);
+}
+
+export async function markChatMessagesAsSeen(pairCode, currentUserId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (!currentUserId) return;
+
+  if (isFirebaseConfigured && db) {
+    const col = collection(db, 'pairs', cleanCode, 'messages');
+    const snap = await getDocs(col);
+    const updates = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      const seenList = Array.isArray(data.seenBy) ? data.seenBy : [];
+      if (!seenList.includes(currentUserId)) {
+        updates.push(updateDoc(docSnap.ref, {
+          seenBy: [...seenList, currentUserId]
+        }));
+      }
+    });
+    await Promise.all(updates);
+    return;
+  }
+
+  // Local fallback
+  const localList = getLocalMessages();
+  const updatedList = localList.map(msg => {
+    const seenList = Array.isArray(msg.seenBy) ? msg.seenBy : [];
+    if (!seenList.includes(currentUserId)) {
+      return { ...msg, seenBy: [...seenList, currentUserId] };
+    }
+    return msg;
+  });
+  saveLocalMessages(updatedList);
+}
+
+export async function reactToChatMessage(pairCode, messageId, user, emoji) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+
+  if (isFirebaseConfigured && db) {
+    const msgRef = doc(db, 'pairs', cleanCode, 'messages', messageId);
+    const snap = await getDoc(msgRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentReactions = data.reactions || {};
+      const emojiData = currentReactions[emoji] || { count: 0, users: [] };
+      let newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      let newCount = emojiData.count || 0;
+
+      if (newUsers.includes(userId)) {
+        newUsers = newUsers.filter(id => id !== userId);
+        newCount = Math.max(0, newCount - 1);
+      } else {
+        newUsers.push(userId);
+        newCount += 1;
+      }
+
+      const updatedReactions = {
+        ...currentReactions,
+        [emoji]: {
+          count: newCount,
+          users: newUsers,
+          lastReactedBy: userName
+        }
+      };
+
+      await updateDoc(msgRef, { reactions: updatedReactions });
+      return updatedReactions;
+    }
+  }
+
+  // Local fallback
+  const localList = getLocalMessages();
+  const idx = localList.findIndex(m => m.id === messageId);
+  if (idx >= 0) {
+    const msg = localList[idx];
+    const currentReactions = msg.reactions || {};
+    const emojiData = currentReactions[emoji] || { count: 0, users: [] };
+    let newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+    let newCount = emojiData.count || 0;
+
+    if (newUsers.includes(userId)) {
+      newUsers = newUsers.filter(id => id !== userId);
+      newCount = Math.max(0, newCount - 1);
+    } else {
+      newUsers.push(userId);
+      newCount += 1;
+    }
+
+    msg.reactions = {
+      ...currentReactions,
+      [emoji]: {
+        count: newCount,
+        users: newUsers,
+        lastReactedBy: userName
+      }
+    };
+    saveLocalMessages(localList);
+    return msg.reactions;
+  }
+  return null;
+}
+
+export async function deleteChatMessage(pairCode, messageId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    await deleteDoc(doc(db, 'pairs', cleanCode, 'messages', messageId));
+  }
+  const localList = getLocalMessages().filter(m => m.id !== messageId);
+  saveLocalMessages(localList);
+}
+
+export async function updateChatMessage(pairCode, messageId, updatedText) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+
+  if (isFirebaseConfigured && db) {
+    const msgRef = doc(db, 'pairs', cleanCode, 'messages', messageId);
+    await updateDoc(msgRef, {
+      text: updatedText,
+      isEdited: true,
+      editedAtIso: pht.isoString,
+      editedAtPHT: pht.fullString
+    });
+    return { id: messageId, text: updatedText, isEdited: true };
+  }
+
+  // Local fallback
+  const localList = getLocalMessages();
+  const idx = localList.findIndex(m => m.id === messageId);
+  if (idx >= 0) {
+    localList[idx].text = updatedText;
+    localList[idx].isEdited = true;
+    localList[idx].editedAtIso = pht.isoString;
+    saveLocalMessages(localList);
+    return localList[idx];
+  }
+  return null;
+}

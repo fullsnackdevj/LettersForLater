@@ -322,25 +322,16 @@ export default function StoryViewerModal({
     touchStartRef.current = null;
   };
 
-  // Trigger floating emoji reaction (Partner can react, max 10 per emoji per user, author cannot react to own story)
+  // Trigger floating emoji reaction (Partner can react with instant burst)
   const handleSendReaction = (emoji) => {
     if (isAuthor || !currentStory) return;
 
-    const emojiData = currentStory.reactions?.[emoji];
-    const userCounts = emojiData?.userCounts || {};
-    let myCount = Number(userCounts[currentUserId]);
-    if (myCount === undefined || isNaN(myCount)) {
-      myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-    }
-
-    if (myCount >= 10) return; // Max 10 reached for this user
-
     // Haptic feedback
     if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-      try { window.navigator.vibrate([30, 40]); } catch (e) {}
+      try { window.navigator.vibrate([25, 35]); } catch {}
     }
 
-    // Spawn floating particle burst
+    // Spawn floating particle burst immediately
     const newParticles = Array.from({ length: 6 }).map((_, idx) => ({
       id: Date.now() + idx + Math.random(),
       emoji,
@@ -355,7 +346,9 @@ export default function StoryViewerModal({
       setFloatingParticles(prev => prev.filter(p => !newParticles.some(np => np.id === p.id)));
     }, 1200);
 
-    onReact(currentStory.id, emoji);
+    if (onReact) {
+      onReact(currentStory.id, emoji);
+    }
   };
 
   // Download Story Media
@@ -853,55 +846,23 @@ export default function StoryViewerModal({
           {/* Tier 1: Emoji Reactions Grid (For Partner only - Author views read-only reactions) */}
           {!isAuthor ? (
             <div className="grid grid-cols-7 gap-1.5 sm:gap-2 items-center justify-items-center w-full">
-              {REACTION_EMOJIS.map((emoji) => {
-                const emojiData = currentStory.reactions?.[emoji];
-                const totalCount = emojiData?.count || 0;
-                const userCounts = emojiData?.userCounts || {};
-                let myCount = Number(userCounts[currentUserId]);
-                if (myCount === undefined || isNaN(myCount)) {
-                  myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-                }
-                const isMaxed = myCount >= 10;
-                const hasReacted = myCount > 0;
-
-                return (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSendReaction(emoji);
-                    }}
-                    disabled={isMaxed}
-                    className={`relative group w-full max-w-[44px] aspect-square rounded-2xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
-                      isMaxed 
-                        ? 'bg-white/5 border border-white/10 opacity-70 cursor-not-allowed' 
-                        : hasReacted
-                          ? 'bg-white/20 border border-[#D4AF37] shadow-sm hover:scale-110 active:scale-125'
-                          : 'bg-white/10 hover:bg-white/20 active:scale-125 border border-white/15 hover:border-white/40'
-                    }`}
-                    title={isMaxed ? `Reached max (10/10) reactions for ${emoji}` : `Send ${emoji} (${myCount}/10)`}
-                    aria-label={`React ${emoji}`}
-                  >
-                    <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform select-none">
-                      {emoji}
-                    </span>
-                    
-                    {/* Reaction Count Badge */}
-                    {totalCount > 0 && (
-                      <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[17px] text-[10px] font-mono font-bold rounded-full shadow-md border text-center ${
-                        isMaxed 
-                          ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]' 
-                          : hasReacted
-                            ? 'bg-[#D4AF37] text-[#36271C] border-white/60'
-                            : 'bg-black/80 text-white border-white/30'
-                      }`}>
-                        {totalCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendReaction(emoji);
+                  }}
+                  className="relative group w-full max-w-[44px] aspect-square rounded-2xl flex items-center justify-center transition-all touch-manipulation cursor-pointer bg-white/10 hover:bg-white/25 active:scale-125 border border-white/15 hover:border-[#D4AF37] shadow-sm select-none"
+                  title={`Send ${emoji}`}
+                  aria-label={`React ${emoji}`}
+                >
+                  <span className="text-xl sm:text-2xl group-hover:scale-110 active:scale-125 transition-transform select-none">
+                    {emoji}
+                  </span>
+                </button>
+              ))}
             </div>
           ) : totalPartnerReactions > 0 ? (
             /* Read-only Received Reactions Summary for Author */
@@ -912,15 +873,14 @@ export default function StoryViewerModal({
               <div className="flex items-center gap-1.5 flex-wrap">
                 {REACTION_EMOJIS.map((emoji) => {
                   const emojiData = currentStory.reactions?.[emoji];
-                  const count = emojiData?.count || 0;
-                  if (count <= 0) return null;
+                  const hasReaction = (emojiData?.count || 0) > 0 || (emojiData?.users?.length || 0) > 0;
+                  if (!hasReaction) return null;
                   return (
                     <span
                       key={emoji}
-                      className="inline-flex items-center gap-1 bg-black/50 border border-[#D4AF37]/60 px-2.5 py-0.5 rounded-full text-xs text-white shadow-xs"
+                      className="inline-flex items-center justify-center bg-black/40 border border-[#D4AF37]/50 px-2 py-0.5 rounded-full text-base shadow-xs"
                     >
                       <span>{emoji}</span>
-                      <span className="font-mono text-[11px] text-[#F8E3B6] font-bold">×{count}</span>
                     </span>
                   );
                 })}

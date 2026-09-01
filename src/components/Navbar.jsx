@@ -12,7 +12,8 @@ import {
   X,
   Eye,
   Video,
-  Phone
+  Phone,
+  MessageCircleHeart
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -26,6 +27,7 @@ export default function Navbar({
   statuses = {},
   partnerPresence,
   hasSeenStoriesIntro = false,
+  unreadMessageCount = 0,
   onOpenAuth, 
   onOpenPairing, 
   onOpenInfo,
@@ -37,7 +39,8 @@ export default function Navbar({
   onOpenStatusPicker,
   onOpenStatusDetail,
   onOpenBucketList,
-  onOpenCallPrompt
+  onOpenCallPrompt,
+  onOpenMessenger
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));
@@ -289,6 +292,36 @@ export default function Navbar({
               </div>
             )}
 
+            {/* Couple Messenger / Chat Sanctuary Button */}
+            {onOpenMessenger && (
+              <div className="relative group shrink-0">
+                <button
+                  type="button"
+                  onClick={onOpenMessenger}
+                  className={`relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 cursor-pointer ${
+                    unreadMessageCount > 0 
+                      ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/60' 
+                      : 'border-[#D4AF37] hover:border-[#A83232]'
+                  }`}
+                  title={unreadMessageCount > 0 ? `Chat with ${partnerName} (${unreadMessageCount} new message${unreadMessageCount === 1 ? '' : 's'})` : `Chat Sanctuary with ${partnerName}`}
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-[#A83232] to-[#8B0000] hover:brightness-110 border border-white flex items-center justify-center text-[#F8E3B6] transition-all shadow-xs relative">
+                    <MessageCircleHeart className="w-4 h-4 text-[#F8E3B6]" />
+                    
+                    {/* Pulsing Notification Dot / Badge */}
+                    {unreadMessageCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-85"></span>
+                        <span className="relative inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-[#D4AF37] text-[#36271C] text-[9px] font-mono font-bold border border-white shadow-xs">
+                          {unreadMessageCount}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -407,6 +440,28 @@ export default function Navbar({
                       </div>
                     </div>
 
+                    {/* Chat Sanctuary in Profile Menu */}
+                    {onOpenMessenger && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          onOpenMessenger();
+                        }}
+                        className="w-full mt-2.5 flex items-center justify-between py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#36271C] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                      >
+                        <div className="flex items-center gap-2">
+                          <MessageCircleHeart className="w-3.5 h-3.5 text-[#A83232]" />
+                          <span>Chat Sanctuary</span>
+                        </div>
+                        {unreadMessageCount > 0 && (
+                          <span className="bg-[#A83232] text-[#F8E3B6] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shadow-2xs">
+                            {unreadMessageCount} new
+                          </span>
+                        )}
+                      </button>
+                    )}
+
                     {/* Call Partner in Profile Menu */}
                     {onOpenCallPrompt && (
                       <button
@@ -415,7 +470,7 @@ export default function Navbar({
                           setIsProfileOpen(false);
                           onOpenCallPrompt();
                         }}
-                        className="w-full mt-2.5 flex items-center justify-center gap-2 py-2 px-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                        className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
                       >
                         <Video className="w-3.5 h-3.5 text-[#F8E3B6]" />
                         <span>Call {partnerName}</span>

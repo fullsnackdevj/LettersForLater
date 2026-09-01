@@ -22,6 +22,7 @@ import BucketListModal from './components/BucketListModal';
 import DailyPrayerModal from './components/DailyPrayerModal';
 import CallPromptModal from './components/CallPromptModal';
 import CallModal from './components/CallModal';
+import MessengerModal from './components/MessengerModal';
 import { Lock, Sparkles, Key } from 'lucide-react';
 
 import { 
@@ -66,7 +67,13 @@ import {
   subscribeToPrayerRequests,
   updatePresenceHeartbeat,
   setPresenceOffline,
-  subscribeToPresence
+  subscribeToPresence,
+  sendChatMessage,
+  subscribeToChatMessages,
+  markChatMessagesAsSeen,
+  reactToChatMessage,
+  deleteChatMessage,
+  updateChatMessage
 } from './services/firebase';
 
 import { getCountdownToTarget } from './utils/pht';
@@ -126,6 +133,10 @@ export default function App() {
   // Daily Prayers Modal ("Our Daily Prayers")
   const [prayers, setPrayers] = useState([]);
   const [isPrayersOpen, setIsPrayersOpen] = useState(false);
+
+  // Couple Messenger / Chat Sanctuary Modal
+  const [messages, setMessages] = useState([]);
+  const [isMessengerOpen, setIsMessengerOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -238,6 +249,15 @@ export default function App() {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const unsubscribe = subscribeToPresence(pairCode, (presencesMap) => {
       setPresences(presencesMap || {});
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Couple Messenger / Chat Sanctuary
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToChatMessages(pairCode, (fetchedMessages) => {
+      setMessages(fetchedMessages || []);
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
@@ -515,52 +535,19 @@ export default function App() {
     setViewerStories(prev => prev.filter(s => s.id !== storyId));
   }, [pairInfo?.code]);
 
-  const handleReactToStory = useCallback(async (storyId, emoji) => {
+  const handleReactToStory = useCallback((storyId, emoji) => {
     if (!storyId || !user) return;
     const userId = user?.uid || 'demo-user-1';
-    const userName = user?.displayName || 'Partner';
-    const timestamp = new Date().toISOString();
 
     const targetStory = stories.find(s => s.id === storyId);
     if (targetStory && targetStory.authorId === userId) {
       return; // Author cannot react to own story
     }
 
-    const updateStoryReactions = (storyList) => storyList.map(s => {
-      if (s.id === storyId) {
-        if (s.authorId === userId) return s;
-        const reactions = { ...(s.reactions || {}) };
-        const emojiData = reactions[emoji] || { count: 0, userCounts: {}, users: [] };
-        const userCounts = { ...(emojiData.userCounts || {}) };
-        if (userCounts[userId] === undefined && emojiData.users?.includes(userId) && emojiData.count) {
-          userCounts[userId] = emojiData.count;
-        }
-        const currentCount = Number(userCounts[userId]) || 0;
-
-        if (currentCount >= 10) return s; // Cap at 10
-
-        userCounts[userId] = currentCount + 1;
-        const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-        const users = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
-        if (!users.includes(userId)) users.push(userId);
-
-        reactions[emoji] = {
-          count: totalCount,
-          userCounts,
-          users,
-          lastReactedBy: userName,
-          lastReactedAt: timestamp
-        };
-
-        return { ...s, reactions };
-      }
-      return s;
+    // Persist reaction smoothly in background without interrupting viewer playback
+    reactToStory(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user, emoji).catch(err => {
+      console.warn('Silent reactToStory error:', err);
     });
-
-    setStories(prev => updateStoryReactions(prev));
-    setViewerStories(prev => updateStoryReactions(prev));
-
-    await reactToStory(pairInfo?.code || '#JayFinallyGotAKiss', storyId, user, emoji);
   }, [pairInfo?.code, user, stories]);
 
   const handleMarkStoryAsViewed = useCallback(async (storyId) => {
@@ -860,6 +847,42 @@ export default function App() {
     setPrayers(prev => prev.filter(p => p.id !== requestId));
   }, [pairInfo?.code]);
 
+  // Couple Messenger / Chat Handlers
+  const handleOpenMessenger = useCallback(() => {
+    setIsMessengerOpen(true);
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const curUserId = user?.uid || 'demo-user-1';
+    markChatMessagesAsSeen(pairCode, curUserId);
+  }, [pairInfo?.code, user]);
+
+  const handleCloseMessenger = useCallback(() => {
+    setIsMessengerOpen(false);
+  }, []);
+
+  const handleSendMessage = useCallback(async (messageData) => {
+    if (!user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await sendChatMessage(pairCode, user, messageData);
+  }, [pairInfo?.code, user]);
+
+  const handleReactToChatMessage = useCallback(async (messageId, emoji) => {
+    if (!user || !messageId || !emoji) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await reactToChatMessage(pairCode, messageId, user, emoji);
+  }, [pairInfo?.code, user]);
+
+  const handleDeleteChatMessage = useCallback(async (messageId) => {
+    if (!messageId) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await deleteChatMessage(pairCode, messageId);
+  }, [pairInfo?.code]);
+
+  const handleUpdateChatMessage = useCallback(async (messageId, updatedText) => {
+    if (!messageId || !updatedText.trim()) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await updateChatMessage(pairCode, messageId, updatedText);
+  }, [pairInfo?.code]);
+
   const handleTimelineButtonClick = () => {
     if (!countdown.isUnlocked) {
       return; // Disabled before 2032
@@ -875,6 +898,12 @@ export default function App() {
   const currentUserId = user?.uid || 'demo-user-1';
   const partnerPresence = Object.values(presences || {}).find(p => p.userId !== currentUserId);
 
+  // Compute unread message count for pulsing notification dot
+  const unreadMessageCount = user ? messages.filter(m => 
+    m.senderId !== currentUserId && 
+    !(m.seenBy || []).includes(currentUserId)
+  ).length : 0;
+
   return (
     <div className="min-h-screen flex flex-col font-sans">
       
@@ -883,7 +912,7 @@ export default function App() {
         <MusicPlayer isCallActive={isCallModalOpen} />
       )}
 
-      {/* Top Navbar with integrated Our Stories & Call Partner */}
+      {/* Top Navbar with integrated Our Stories & Call Partner & Chat Sanctuary */}
       <Navbar
         user={user}
         pairInfo={pairInfo}
@@ -892,6 +921,7 @@ export default function App() {
         statuses={statuses}
         partnerPresence={partnerPresence}
         hasSeenStoriesIntro={hasSeenStoriesIntro}
+        unreadMessageCount={unreadMessageCount}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
         onOpenInfo={() => setIsInfoOpen(true)}
@@ -906,6 +936,7 @@ export default function App() {
         onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
         onOpenBucketList={() => setIsBucketListOpen(true)}
         onOpenCallPrompt={() => setIsCallPromptOpen(true)}
+        onOpenMessenger={handleOpenMessenger}
       />
 
       {/* Couple Live Status Ribbon ("What We're Currently Doing") */}
@@ -1203,6 +1234,22 @@ export default function App() {
         onSendReaction={handleSendCallReaction}
         onSwitchCamera={handleSwitchCamera}
         facingMode={callFacingMode}
+      />
+
+      {/* Couple Messenger & Chat Sanctuary Modal */}
+      <MessengerModal
+        isOpen={isMessengerOpen}
+        onClose={handleCloseMessenger}
+        currentUser={user}
+        pairInfo={pairInfo}
+        partnerPresence={partnerPresence}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        onReactToMessage={handleReactToChatMessage}
+        onDeleteMessage={handleDeleteChatMessage}
+        onUpdateMessage={handleUpdateChatMessage}
+        onSaveToVault={handleSaveBucketItem}
+        onOpenCallPrompt={() => setIsCallPromptOpen(true)}
       />
 
       {/* Floating Jay Companion */}
