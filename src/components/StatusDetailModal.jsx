@@ -129,7 +129,7 @@ export default function StatusDetailModal({
   };
 
   const handleSendCheer = (cheerText) => {
-    if (isMine || !targetUserId) return;
+    if (!targetUserId) return;
     if (onSendCheer) {
       onSendCheer(targetUserId, cheerText);
     } else {
@@ -170,14 +170,31 @@ export default function StatusDetailModal({
             {isMine ? 'Your Note' : `${targetName}'s Note`}
           </span>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-[#EFE9DE] hover:bg-[#E2D7C7] text-[#4A3B2C] flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
-            title="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {isMine && onOpenStatusPicker && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenStatusPicker();
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#A83232] text-[10px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="Change status"
+              >
+                <Edit3 className="w-2.5 h-2.5 text-[#A83232]" />
+                <span>Edit</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-[#EFE9DE] hover:bg-[#E2D7C7] text-[#4A3B2C] flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Container */}
@@ -290,42 +307,44 @@ export default function StatusDetailModal({
                 <p className="text-[10px] text-[#9E8B75]">
                   {!isMine 
                     ? `Send ${targetName} a sweet reply or cheer below 💕` 
-                    : `Waiting for a sweet reply from ${partnerName} 💕`}
+                    : `Write a reply or wait for ${partnerName} 💕`}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Quick Reaction Bar & Custom Reply (For Partner's Note) */}
-          {!isMine ? (
-            <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
-              
-              {/* Quick Cheer Suggestion Pills */}
-              {contextualCheers && contextualCheers.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#9E8B75]">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
-                      <span>Quick Cheers</span>
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-                    {contextualCheers.slice(0, 6).map((presetCheer, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleSendCheer(presetCheer)}
-                        className="shrink-0 bg-white hover:bg-[#FAF5EC] active:scale-95 border border-[#E2D7C7] hover:border-[#D4AF37] text-[#36271C] text-[11px] font-medium px-2.5 py-1 rounded-full shadow-2xs transition-all cursor-pointer whitespace-nowrap"
-                        title={`Send "${presetCheer}"`}
-                      >
-                        {presetCheer}
-                      </button>
-                    ))}
-                  </div>
+          {/* ─────────────────────────────────────────────────────────────
+              INTERACTIONS & REPLIES SECTION
+             ───────────────────────────────────────────────────────────── */}
+          <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
+            
+            {/* Quick Cheer Suggestion Pills (For Partner) */}
+            {!isMine && contextualCheers && contextualCheers.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#9E8B75]">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
+                    <span>Quick Cheers</span>
+                  </span>
                 </div>
-              )}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                  {contextualCheers.slice(0, 6).map((presetCheer, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSendCheer(presetCheer)}
+                      className="shrink-0 bg-white hover:bg-[#FAF5EC] active:scale-95 border border-[#E2D7C7] hover:border-[#D4AF37] text-[#36271C] text-[11px] font-medium px-2.5 py-1 rounded-full shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+                      title={`Send "${presetCheer}"`}
+                    >
+                      {presetCheer}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-              {/* Quick Reactions Header & Buttons */}
+            {/* Quick Reactions Header & Buttons (For Partner) */}
+            {!isMine && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
                   <span>Tap to React 💕</span>
@@ -395,89 +414,90 @@ export default function StatusDetailModal({
                   })}
                 </div>
               </div>
+            )}
 
-              {/* Custom Sweet Reply Input Form */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!customCheerText.trim()) return;
-                  handleSendCheer(customCheerText.trim());
-                  setCustomCheerText('');
-                }}
-                className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
+            {/* Partner Reactions Summary (For Author) */}
+            {isMine && totalPartnerReactions > 0 && (
+              <div className="p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#D4AF37]/40 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#9E8B75] flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
+                  <span>Reactions from {partnerName}</span>
+                </span>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {Object.entries(targetStatus.reactions || {}).map(([emoji, data]) => {
+                    const count = Number(data?.count) || 0;
+                    if (count <= 0) return null;
+                    return (
+                      <span 
+                        key={emoji}
+                        className="inline-flex items-center gap-1 bg-white border border-[#E2D7C7] px-2 py-0.5 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
+                      >
+                        <span>{emoji}</span>
+                        <span className="text-[10px] text-[#A83232] font-mono font-bold">x{count}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Universal Reply Input Form (For Both Note Author & Partner) */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!customCheerText.trim()) return;
+                handleSendCheer(customCheerText.trim());
+                setCustomCheerText('');
+              }}
+              className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
+            >
+              <input
+                type="text"
+                value={customCheerText}
+                onChange={(e) => setCustomCheerText(e.target.value)}
+                maxLength={100}
+                placeholder={isMine ? `Reply to ${partnerName}...` : `Write a sweet reply to ${targetName}...`}
+                className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none font-medium"
+              />
+              <button
+                type="submit"
+                disabled={!customCheerText.trim()}
+                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                  customCheerText.trim()
+                    ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
+                    : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
+                }`}
+                title="Send reply"
               >
-                <input
-                  type="text"
-                  value={customCheerText}
-                  onChange={(e) => setCustomCheerText(e.target.value)}
-                  maxLength={100}
-                  placeholder={`Write a sweet reply to ${partnerName}...`}
-                  className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none font-medium"
-                />
-                <button
-                  type="submit"
-                  disabled={!customCheerText.trim()}
-                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                    customCheerText.trim()
-                      ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
-                      : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
-                  }`}
-                  title="Send reply"
-                >
-                  <span>Send</span>
-                  <Send className="w-3 h-3" />
-                </button>
-              </form>
+                <span>Send</span>
+                <Send className="w-3 h-3" />
+              </button>
+            </form>
 
-              {/* Sent Reply Toast / Confirmation */}
-              {sentCheer && (
-                <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate">Sent reply: "{sentCheer}"</span>
-                </div>
-              )}
+            {/* Sent Reply Toast / Confirmation */}
+            {sentCheer && (
+              <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">Sent reply: "{sentCheer}"</span>
+              </div>
+            )}
 
-            </div>
-          ) : (
-            <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
-              {/* Partner Reactions Summary for Author */}
-              {totalPartnerReactions > 0 && (
-                <div className="p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#D4AF37]/40 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#9E8B75] flex items-center gap-1">
-                    <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
-                    <span>Reactions from {partnerName}</span>
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {Object.entries(targetStatus.reactions || {}).map(([emoji, data]) => {
-                      const count = Number(data?.count) || 0;
-                      if (count <= 0) return null;
-                      return (
-                        <span 
-                          key={emoji}
-                          className="inline-flex items-center gap-1 bg-white border border-[#E2D7C7] px-2 py-0.5 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
-                        >
-                          <span>{emoji}</span>
-                          <span className="text-[10px] text-[#A83232] font-mono font-bold">x{count}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
+            {/* Bottom Change My Status Button (For Note Author) */}
+            {isMine && onOpenStatusPicker && (
               <button
                 type="button"
                 onClick={() => {
                   onClose();
                   onOpenStatusPicker();
                 }}
-                className="w-full py-2.5 rounded-2xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-xs font-bold shadow-md transition-all hover:scale-102 active:scale-98 flex items-center justify-center gap-1.5 border border-[#D4AF37]/50 cursor-pointer"
+                className="w-full py-2 rounded-2xl bg-[#FAF5EC] hover:bg-[#EAE2D3] text-[#36271C] text-xs font-bold shadow-xs transition-all hover:scale-101 active:scale-98 flex items-center justify-center gap-1.5 border border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Change My Status</span>
+                <Edit3 className="w-3.5 h-3.5 text-[#A83232]" />
+                <span>Change / Update My Status</span>
               </button>
-            </div>
-          )}
+            )}
+
+          </div>
 
         </div>
 

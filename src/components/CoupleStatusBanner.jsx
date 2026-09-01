@@ -46,6 +46,12 @@ export default function CoupleStatusBanner({
     !partnerStatus.viewedBy.includes(currentUserId)
   );
 
+  const isMyStatusUnseen = Boolean(
+    myStatus &&
+    Array.isArray(myStatus.viewedBy) &&
+    !myStatus.viewedBy.includes(currentUserId)
+  );
+
   const myStatusSeen = myStatus?.viewedBy?.some(id => id !== currentUserId);
 
   const scrollContainerRef = useRef(null);
@@ -192,16 +198,26 @@ export default function CoupleStatusBanner({
                 if (myStatus) onOpenStatusDetail(myStatus);
                 else onOpenStatusPicker();
               }}
-              className="w-full bg-white/95 hover:bg-white border border-[#D2C3B0] hover:border-[#A83232] rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2.5 cursor-pointer group"
+              className={`w-full bg-white/95 hover:bg-white border rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2.5 cursor-pointer group ${
+                isMyStatusUnseen
+                  ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/70 bg-gradient-to-r from-[#FFFDF9] via-[#FFF9EE] to-[#FFF5F5]'
+                  : 'border-[#D2C3B0] hover:border-[#A83232]'
+              }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 
                 {/* Compact Avatar / Emoji */}
                 <div className="relative shrink-0">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#FAF5EC] border border-[#D2C3B0] group-hover:border-[#A83232] flex items-center justify-center text-base sm:text-lg shadow-xs group-hover:scale-105 transition-transform">
-                    {myStatus?.emoji || '💬'}
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shadow-xs group-hover:scale-105 transition-transform ${
+                    isMyStatusUnseen
+                      ? 'story-ring-glow animate-story-pulse p-[2px]'
+                      : 'bg-[#FAF5EC] border border-[#D2C3B0] group-hover:border-[#A83232]'
+                  }`}>
+                    <div className="w-full h-full rounded-xl bg-[#FAF5EC] flex items-center justify-center">
+                      {myStatus?.emoji || '💬'}
+                    </div>
                   </div>
-                  {myStatusSeen && (
+                  {myStatusSeen && !isMyStatusUnseen && (
                     <span className="absolute -top-0.5 -right-0.5 bg-emerald-700 text-white rounded-full p-0.5 border border-white shadow-xs" title="Seen by partner 💕">
                       <Eye className="w-2 h-2" />
                     </span>
@@ -219,7 +235,12 @@ export default function CoupleStatusBanner({
                         • {getTimeAgo(myStatus.updatedAtIso)}
                       </span>
                     )}
-                    {myStatusSeen && (
+                    {isMyStatusUnseen && (
+                      <span className="text-[8px] bg-[#A83232] text-[#F8E3B6] border border-[#D4AF37] px-1 py-0.2 rounded-full font-bold shadow-xs animate-bounce shrink-0">
+                        NEW REPLY
+                      </span>
+                    )}
+                    {myStatusSeen && !isMyStatusUnseen && (
                       <span className="text-[8px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded-full font-medium inline-block">
                         Seen 💕
                       </span>

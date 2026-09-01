@@ -696,9 +696,6 @@ export default function App() {
     if (!targetUserId || !user || !cheerText) return;
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const currentUserId = user.uid || 'demo-user-1';
-    // User cannot cheer their own status note
-    if (targetUserId === currentUserId) return;
-
     const currentUserName = user.displayName || 'Partner';
     const timestamp = new Date().toISOString();
 
@@ -716,7 +713,8 @@ export default function App() {
       const updatedDoc = {
         ...target,
         lastCheer: cheerObj,
-        cheers: [cheerObj, ...currentCheers.slice(0, 19)]
+        cheers: [cheerObj, ...currentCheers.slice(0, 19)],
+        viewedBy: [currentUserId]
       };
 
       if (selectedStatusForDetail?.userId === targetUserId) {

@@ -981,11 +981,6 @@ export async function sendCheerToStatus(pairCode, targetUserId, user, cheerText)
   const userName = user?.displayName || 'Partner';
   const timestamp = new Date().toISOString();
 
-  // Guard: User cannot cheer their own status note
-  if (targetUserId === userId) {
-    return null;
-  }
-
   const cheerObj = {
     text: cheerText,
     fromName: userName,
@@ -1001,33 +996,36 @@ export async function sendCheerToStatus(pairCode, targetUserId, user, cheerText)
       const currentCheers = Array.isArray(data.cheers) ? data.cheers : [];
       const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
 
-      // Increment '💬' reaction count
-      const currentReactions = data.reactions || {};
-      const emojiData = currentReactions['💬'] || { count: 0, userCounts: {}, users: [] };
-      const userCounts = { ...(emojiData.userCounts || {}) };
-      const myCount = Number(userCounts[userId]) || 0;
-      userCounts[userId] = Math.min(10, myCount + 1);
-      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
-      if (!newUsers.includes(userId)) newUsers.push(userId);
+      // Increment '💬' reaction count if sent by partner
+      let updatedReactions = data.reactions || {};
+      if (targetUserId !== userId) {
+        const emojiData = updatedReactions['💬'] || { count: 0, userCounts: {}, users: [] };
+        const userCounts = { ...(emojiData.userCounts || {}) };
+        const myCount = Number(userCounts[userId]) || 0;
+        userCounts[userId] = Math.min(10, myCount + 1);
+        const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+        const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+        if (!newUsers.includes(userId)) newUsers.push(userId);
 
-      const updatedReactions = {
-        ...currentReactions,
-        ['💬']: {
-          count: totalCount,
-          userCounts,
-          users: newUsers,
-          lastReactedBy: userName,
-          lastReactedAt: timestamp
-        }
-      };
+        updatedReactions = {
+          ...updatedReactions,
+          ['💬']: {
+            count: totalCount,
+            userCounts,
+            users: newUsers,
+            lastReactedBy: userName,
+            lastReactedAt: timestamp
+          }
+        };
+      }
 
       await updateDoc(statusRef, {
         lastCheer: cheerObj,
         cheers: updatedCheers,
-        reactions: updatedReactions
+        reactions: updatedReactions,
+        viewedBy: [userId]
       });
-      return { lastCheer: cheerObj, cheers: updatedCheers, reactions: updatedReactions };
+      return { lastCheer: cheerObj, cheers: updatedCheers, reactions: updatedReactions, viewedBy: [userId] };
     }
   }
 
@@ -1040,25 +1038,28 @@ export async function sendCheerToStatus(pairCode, targetUserId, user, cheerText)
     const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
     status.lastCheer = cheerObj;
     status.cheers = updatedCheers;
+    status.viewedBy = [userId];
 
-    status.reactions = status.reactions || {};
-    const emojiData = status.reactions['💬'] || { count: 0, userCounts: {}, users: [] };
-    const userCounts = { ...(emojiData.userCounts || {}) };
-    const myCount = Number(userCounts[userId]) || 0;
-    userCounts[userId] = Math.min(10, myCount + 1);
-    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
-    const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
-    if (!newUsers.includes(userId)) newUsers.push(userId);
+    if (targetUserId !== userId) {
+      status.reactions = status.reactions || {};
+      const emojiData = status.reactions['💬'] || { count: 0, userCounts: {}, users: [] };
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      const myCount = Number(userCounts[userId]) || 0;
+      userCounts[userId] = Math.min(10, myCount + 1);
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!newUsers.includes(userId)) newUsers.push(userId);
 
-    status.reactions['💬'] = {
-      count: totalCount,
-      userCounts,
-      users: newUsers,
-      lastReactedBy: userName,
-      lastReactedAt: timestamp
-    };
+      status.reactions['💬'] = {
+        count: totalCount,
+        userCounts,
+        users: newUsers,
+        lastReactedBy: userName,
+        lastReactedAt: timestamp
+      };
+    }
     saveLocalStatuses(local);
-    return { lastCheer: cheerObj, cheers: updatedCheers, reactions: status.reactions };
+    return { lastCheer: cheerObj, cheers: updatedCheers, reactions: status.reactions, viewedBy: [userId] };
   }
   return null;
 }
