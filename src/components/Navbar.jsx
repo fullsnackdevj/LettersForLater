@@ -13,7 +13,9 @@ import {
   Eye,
   Video,
   Phone,
-  MessageCircleHeart
+  MessageCircleHeart,
+  ExternalLink,
+  FolderHeart
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -489,6 +491,19 @@ export default function Navbar({
                       <HelpCircle className="w-3.5 h-3.5 text-[#A83232]" />
                       <span>How It Works & Info</span>
                     </button>
+
+                    {/* Google Drive Link */}
+                    <a
+                      href="https://drive.google.com/drive/folders/16zf1NeDt3F-OJDSGYYnbUpxCTf-VazB1?usp=sharing"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95 no-underline"
+                    >
+                      <FolderHeart className="w-3.5 h-3.5 text-[#A83232]" />
+                      <span>Open Google Drive</span>
+                      <ExternalLink className="w-3 h-3 text-[#9E8B75]" />
+                    </a>
 
                     <button
                       type="button"

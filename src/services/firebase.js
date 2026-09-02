@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
+import { getNickname } from '../utils/nicknames';
 
 // Firebase configuration (Loaded from import.meta.env or fallback)
 const firebaseConfig = {
@@ -1618,24 +1619,38 @@ export function subscribeToChatMessages(pairCode, callback) {
   return () => clearInterval(pollInterval);
 }
 
-export async function markChatMessagesAsSeen(pairCode, currentUserId) {
+export async function markChatMessagesAsSeen(pairCode, userOrId) {
   const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
-  if (!currentUserId) return;
+  if (!userOrId) return;
+
+  const userId = typeof userOrId === 'object' ? (userOrId.uid || 'demo-user-1') : userOrId;
+  const userName = typeof userOrId === 'object' && userOrId.displayName ? getNickname(userOrId.displayName) : null;
+  const userEmail = typeof userOrId === 'object' && userOrId.email ? userOrId.email.toLowerCase() : null;
+
+  const identifiersToAdd = [userId, userName, userEmail].filter(Boolean);
 
   if (isFirebaseConfigured && db) {
-    const col = collection(db, 'pairs', cleanCode, 'messages');
-    const snap = await getDocs(col);
-    const updates = [];
-    snap.forEach((docSnap) => {
-      const data = docSnap.data();
-      const seenList = Array.isArray(data.seenBy) ? data.seenBy : [];
-      if (!seenList.includes(currentUserId)) {
-        updates.push(updateDoc(docSnap.ref, {
-          seenBy: [...seenList, currentUserId]
-        }));
+    try {
+      const col = collection(db, 'pairs', cleanCode, 'messages');
+      const snap = await getDocs(col);
+      const updates = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const seenList = Array.isArray(data.seenBy) ? data.seenBy : [];
+        const isAlreadySeen = seenList.some(id => identifiersToAdd.includes(id));
+        if (!isAlreadySeen) {
+          const merged = Array.from(new Set([...seenList, userId, ...(userName ? [userName] : [])]));
+          updates.push(updateDoc(docSnap.ref, {
+            seenBy: merged
+          }));
+        }
+      });
+      if (updates.length > 0) {
+        await Promise.all(updates);
       }
-    });
-    await Promise.all(updates);
+    } catch (err) {
+      console.warn('Error marking messages as seen in Firebase:', err);
+    }
     return;
   }
 
@@ -1643,8 +1658,10 @@ export async function markChatMessagesAsSeen(pairCode, currentUserId) {
   const localList = getLocalMessages();
   const updatedList = localList.map(msg => {
     const seenList = Array.isArray(msg.seenBy) ? msg.seenBy : [];
-    if (!seenList.includes(currentUserId)) {
-      return { ...msg, seenBy: [...seenList, currentUserId] };
+    const isAlreadySeen = seenList.some(id => identifiersToAdd.includes(id));
+    if (!isAlreadySeen) {
+      const merged = Array.from(new Set([...seenList, userId, ...(userName ? [userName] : [])]));
+      return { ...msg, seenBy: merged };
     }
     return msg;
   });

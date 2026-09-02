@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   X, 
   Send, 
@@ -24,6 +24,7 @@ import confetti from 'canvas-confetti';
 import html2canvas from 'html2canvas';
 import { getNickname } from '../utils/nicknames';
 import { getPresenceInfo } from '../utils/presence';
+import { isMessageFromMe, isMessageSeenByPartner } from '../utils/chatUtils';
 import { compressImage } from '../utils/imageCompressor';
 import { downloadImage } from '../utils/fileDownloader';
 import VintageAudioPlayer from './VintageAudioPlayer';
@@ -85,6 +86,66 @@ const EMOJI_CATEGORIES = [
   }
 ];
 
+// ── Pure utility functions (outside component to avoid re-creation) ──
+
+// Format message time in PHT (e.g. 10:24 AM)
+const formatTime = (isoString) => {
+  if (!isoString) return '';
+  try {
+    const date = new Date(isoString);
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
+  } catch {
+    return '';
+  }
+};
+
+// Format date header (Today, Yesterday, MMM d, yyyy)
+const formatDateHeader = (isoString) => {
+  if (!isoString) return '';
+  try {
+    const msgDate = new Date(isoString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const msgDayStr = msgDate.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+    const todayStr = today.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+    const yesterdayStr = yesterday.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+
+    if (msgDayStr === todayStr) return 'Today';
+    if (msgDayStr === yesterdayStr) return 'Yesterday';
+
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    }).format(msgDate);
+  } catch {
+    return '';
+  }
+};
+
+// Check if text is only 1-3 emojis (Messenger style large emoji rendering)
+const getEmojiRenderSize = (text) => {
+  if (!text) return null;
+  const trimmed = text.trim();
+  // Regular expression for emoji detection
+  const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}|\s)+$/u;
+  if (!emojiRegex.test(trimmed)) return null;
+
+  // Count distinct graphemes/emojis
+  const emojiArray = Array.from(trimmed.replace(/\s/g, ''));
+  if (emojiArray.length === 1 || trimmed.length <= 4) return 'text-5xl';
+  if (emojiArray.length <= 3) return 'text-3xl';
+  return null;
+};
+
 export default function MessengerModal({
   isOpen,
   onClose,
@@ -142,8 +203,21 @@ export default function MessengerModal({
   const partnerName = currentUserName === user2Name ? 'Jay' : user2Name;
   const partnerPresenceInfo = getPresenceInfo(partnerPresence);
 
-  // Partner's avatar
-  const partnerPhoto = pairInfo?.user2?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100';
+  // Partner's avatar — derive from their most recent message senderPhoto,
+  // then fall back to pairInfo (checking both user2 and user1 depending on who we are)
+  const partnerPhoto = useMemo(() => {
+    // Find the most recent message from the partner and grab their senderPhoto
+    const partnerMessage = [...messages].reverse().find(m => !isMessageFromMe(m, currentUser, pairInfo) && m.senderPhoto);
+    if (partnerMessage?.senderPhoto) return partnerMessage.senderPhoto;
+
+    // Fall back to pairInfo — if we're user2, partner is user1 (Jay), and vice versa
+    if (currentUserName === user2Name) {
+      // I am user2, partner is user1
+      return pairInfo?.user1?.photo || currentUser?.photoURL || '';
+    }
+    // I am user1, partner is user2
+    return pairInfo?.user2?.photo || '';
+  }, [messages, currentUserId, currentUserName, user2Name, pairInfo, currentUser?.photoURL]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -153,6 +227,27 @@ export default function MessengerModal({
       }, 100);
     }
   }, [isOpen, messages.length]);
+
+  // Show temporary toast
+  const showToast = useCallback((msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  // Adjust Textarea Height dynamically up to 5 lines (Messenger style)
+  const handleTextareaInput = useCallback((e) => {
+    const text = e.target.value;
+    setInputText(text);
+
+    const target = textareaRef.current;
+    if (target) {
+      target.style.height = 'auto';
+      const lineHeight = 22;
+      const maxHeight = lineHeight * 5 + 12; // 5 lines limit
+      target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
+      target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    }
+  }, []);
 
   // Clean up audio recorder
   useEffect(() => {
@@ -165,85 +260,6 @@ export default function MessengerModal({
   }, []);
 
   if (!isOpen) return null;
-
-  // Show temporary toast
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  // Adjust Textarea Height dynamically up to 5 lines (Messenger style)
-  const handleTextareaInput = (e) => {
-    const text = e.target.value;
-    setInputText(text);
-
-    const target = textareaRef.current;
-    if (target) {
-      target.style.height = 'auto';
-      const lineHeight = 22;
-      const maxHeight = lineHeight * 5 + 12; // 5 lines limit
-      target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
-      target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
-    }
-  };
-
-  // Format message time in PHT (e.g. 10:24 AM)
-  const formatTime = (isoString) => {
-    if (!isoString) return '';
-    try {
-      const date = new Date(isoString);
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Manila',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }).format(date);
-    } catch {
-      return '';
-    }
-  };
-
-  // Format date header (Today, Yesterday, MMM d, yyyy)
-  const formatDateHeader = (isoString) => {
-    if (!isoString) return '';
-    try {
-      const msgDate = new Date(isoString);
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const msgDayStr = msgDate.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
-      const todayStr = today.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
-      const yesterdayStr = yesterday.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
-
-      if (msgDayStr === todayStr) return 'Today';
-      if (msgDayStr === yesterdayStr) return 'Yesterday';
-
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Manila',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      }).format(msgDate);
-    } catch {
-      return '';
-    }
-  };
-
-  // Check if text is only 1-3 emojis (Messenger style large emoji rendering)
-  const getEmojiRenderSize = (text) => {
-    if (!text) return null;
-    const trimmed = text.trim();
-    // Regular expression for emoji detection
-    const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}|\s)+$/u;
-    if (!emojiRegex.test(trimmed)) return null;
-
-    // Count distinct graphemes/emojis
-    const emojiArray = Array.from(trimmed.replace(/\s/g, ''));
-    if (emojiArray.length === 1 || trimmed.length <= 4) return 'text-5xl';
-    if (emojiArray.length <= 3) return 'text-3xl';
-    return null;
-  };
 
   // Handle Photo selection with compression
   const handlePhotoSelect = async (e) => {
@@ -660,9 +676,9 @@ export default function MessengerModal({
 
         </div>
 
-        {/* ─────────────────────────────────────────────────────────────
+        {/* ───────────────────────────────────────────────────────────────────
             MESSAGES STREAM CONTAINER (Captured for Screenshot)
-           ───────────────────────────────────────────────────────────── */}
+           ────────────────────────────────────────────────────────────────── */}
         <div 
           ref={chatAreaRef}
           className="flex-1 overflow-y-auto custom-scrollbar p-3.5 sm:p-4 space-y-3 bg-[#FDFBF7]"
@@ -681,7 +697,7 @@ export default function MessengerModal({
 
           {/* Render Messages */}
           {messages.map((msg, idx) => {
-            const isMe = msg.senderId === currentUserId;
+            const isMe = isMessageFromMe(msg, currentUser, pairInfo);
             const prevMsg = messages[idx - 1];
             const showDateHeader = !prevMsg || formatDateHeader(prevMsg.createdAtIso) !== formatDateHeader(msg.createdAtIso);
             const isHovered = hoveredMessageId === msg.id;
@@ -833,6 +849,7 @@ export default function MessengerModal({
                         <img
                           src={msg.mediaUrl}
                           alt="Memory"
+                          loading="lazy"
                           onClick={(e) => {
                             e.stopPropagation();
                             setActivePhotoLightbox(msg.mediaUrl);
@@ -879,7 +896,7 @@ export default function MessengerModal({
                       )}
                       {isMe && (
                         <span>
-                          {msg.seenBy?.some(id => id !== currentUserId) ? (
+                          {isMessageSeenByPartner(msg, currentUser, pairInfo) ? (
                             <span className="text-emerald-700 font-bold" title={`Seen by ${partnerName} 💕`}>
                               Seen 💕
                             </span>
@@ -1387,7 +1404,7 @@ export default function MessengerModal({
               </button>
 
               {/* Edit Message (if mine & text) */}
-              {activeActionSheetMessage.senderId === currentUserId && activeActionSheetMessage.text && onUpdateMessage && (
+              {isMessageFromMe(activeActionSheetMessage, currentUser, pairInfo) && activeActionSheetMessage.text && onUpdateMessage && (
                 <button
                   type="button"
                   onClick={() => handleStartEdit(activeActionSheetMessage)}
@@ -1421,7 +1438,7 @@ export default function MessengerModal({
               )}
 
               {/* Unsend Message (if mine) */}
-              {activeActionSheetMessage.senderId === currentUserId && onDeleteMessage && (
+              {isMessageFromMe(activeActionSheetMessage, currentUser, pairInfo) && onDeleteMessage && (
                 <button
                   type="button"
                   onClick={() => handleUnsendClick(activeActionSheetMessage)}

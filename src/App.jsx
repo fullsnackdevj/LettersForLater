@@ -78,6 +78,7 @@ import {
 
 import { getCountdownToTarget } from './utils/pht';
 import { getNickname } from './utils/nicknames';
+import { isMessageReadByMe, getLastReadChatTimestamp, setLastReadChatTimestamp } from './utils/chatUtils';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -137,6 +138,7 @@ export default function App() {
   // Couple Messenger / Chat Sanctuary Modal
   const [messages, setMessages] = useState([]);
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
+  const [lastReadChatTimestamp, setLastReadChatTimestampState] = useState(0);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -261,6 +263,29 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
+
+  // Synchronize lastReadChatTimestamp whenever user or pair changes
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const curUserId = user?.uid || 'demo-user-1';
+    setLastReadChatTimestampState(getLastReadChatTimestamp(pairCode, curUserId));
+  }, [user, pairInfo?.code]);
+
+  // When messenger is open, automatically mark incoming/current messages as read
+  useEffect(() => {
+    if (isMessengerOpen && user) {
+      const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+      const curUserId = user.uid || 'demo-user-1';
+      const now = Date.now();
+      setLastReadChatTimestamp(pairCode, curUserId, now);
+      setLastReadChatTimestampState(now);
+
+      const hasUnseen = messages.some(m => !isMessageReadByMe(m, user, pairInfo, 0));
+      if (hasUnseen) {
+        markChatMessagesAsSeen(pairCode, user);
+      }
+    }
+  }, [isMessengerOpen, messages, user, pairInfo]);
 
   // Send Active Presence Heartbeat while user is active on the app
   useEffect(() => {
@@ -852,7 +877,12 @@ export default function App() {
     setIsMessengerOpen(true);
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const curUserId = user?.uid || 'demo-user-1';
-    markChatMessagesAsSeen(pairCode, curUserId);
+    const now = Date.now();
+    setLastReadChatTimestamp(pairCode, curUserId, now);
+    setLastReadChatTimestampState(now);
+    if (user) {
+      markChatMessagesAsSeen(pairCode, user);
+    }
   }, [pairInfo?.code, user]);
 
   const handleCloseMessenger = useCallback(() => {
@@ -898,10 +928,9 @@ export default function App() {
   const currentUserId = user?.uid || 'demo-user-1';
   const partnerPresence = Object.values(presences || {}).find(p => p.userId !== currentUserId);
 
-  // Compute unread message count for pulsing notification dot
-  const unreadMessageCount = user ? messages.filter(m => 
-    m.senderId !== currentUserId && 
-    !(m.seenBy || []).includes(currentUserId)
+  // Compute unread message count (excludes own messages and already-read messages)
+  const unreadMessageCount = (user && !isMessengerOpen) ? messages.filter(m => 
+    !isMessageReadByMe(m, user, pairInfo, lastReadChatTimestamp)
   ).length : 0;
 
   return (
