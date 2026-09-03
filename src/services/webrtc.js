@@ -158,8 +158,11 @@ export async function getLocalUserMedia(callType = 'video', facingMode = 'user')
 
 /**
  * Switch camera between Front / Back
+ * @param {MediaStream} localStream - The active local media stream
+ * @param {string} currentFacingMode - 'user' or 'environment'
+ * @param {RTCPeerConnection} [peerConnection] - The active WebRTC peer connection (required to push new track to remote peer)
  */
-export async function switchCameraTrack(localStream, currentFacingMode) {
+export async function switchCameraTrack(localStream, currentFacingMode, peerConnection) {
   if (!localStream) return currentFacingMode;
   const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
 
@@ -170,6 +173,18 @@ export async function switchCameraTrack(localStream, currentFacingMode) {
     const newVideoTrack = newStream.getVideoTracks()[0];
     const oldVideoTrack = localStream.getVideoTracks()[0];
 
+    // Replace the track on the PeerConnection's video sender so the remote
+    // peer receives the new camera feed instead of a frozen frame.
+    if (peerConnection) {
+      const videoSender = peerConnection.getSenders().find(
+        sender => sender.track && sender.track.kind === 'video'
+      );
+      if (videoSender) {
+        await videoSender.replaceTrack(newVideoTrack);
+      }
+    }
+
+    // Swap the track on the local MediaStream (updates local preview)
     if (oldVideoTrack) {
       localStream.removeTrack(oldVideoTrack);
       oldVideoTrack.stop();

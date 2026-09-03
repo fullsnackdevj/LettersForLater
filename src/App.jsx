@@ -151,6 +151,7 @@ export default function App() {
   const [remoteMediaStream, setRemoteMediaStream] = useState(null);
   const [callFacingMode, setCallFacingMode] = useState('user');
   const activeCallCleanupRef = useRef(null);
+  const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
 
   // Subscribe to Auth State & auto-manage Auth Modal
@@ -336,6 +337,10 @@ export default function App() {
       } catch (e) {}
       activeCallCleanupRef.current = null;
     }
+    if (peerConnectionRef.current) {
+      try { peerConnectionRef.current.close(); } catch (e) {}
+      peerConnectionRef.current = null;
+    }
     if (localStreamRef.current) {
       stopMediaStream(localStreamRef.current);
       localStreamRef.current = null;
@@ -345,6 +350,7 @@ export default function App() {
     setIsCallModalOpen(false);
     setIsCallMinimized(false);
     setActiveCallData(null);
+    setCallFacingMode('user');
   }, []);
 
   const activeCallCleanupCallbackRef = useRef(handleCleanUpCall);
@@ -415,7 +421,7 @@ export default function App() {
       localStreamRef.current = stream;
       setLocalMediaStream(stream);
 
-      const { cleanup } = await startOutgoingCall({
+      const { peerConnection, cleanup } = await startOutgoingCall({
         pairCode,
         callerUser: user,
         receiverUser: partnerUser,
@@ -435,6 +441,7 @@ export default function App() {
         }
       });
 
+      peerConnectionRef.current = peerConnection;
       activeCallCleanupRef.current = cleanup;
     } catch (err) {
       console.error('Error starting outgoing call:', err);
@@ -453,7 +460,7 @@ export default function App() {
       localStreamRef.current = stream;
       setLocalMediaStream(stream);
 
-      const { cleanup } = await acceptIncomingCall({
+      const { peerConnection, cleanup } = await acceptIncomingCall({
         pairCode,
         callData: activeCallData,
         localStream: stream,
@@ -469,6 +476,7 @@ export default function App() {
         }
       });
 
+      peerConnectionRef.current = peerConnection;
       activeCallCleanupRef.current = cleanup;
     } catch (err) {
       console.error('Error accepting call:', err);
@@ -496,7 +504,11 @@ export default function App() {
 
   const handleSwitchCamera = useCallback(async (currentMode) => {
     if (localStreamRef.current) {
-      const newMode = await switchCameraTrack(localStreamRef.current, currentMode);
+      const newMode = await switchCameraTrack(
+        localStreamRef.current,
+        currentMode,
+        peerConnectionRef.current
+      );
       setCallFacingMode(newMode);
       return newMode;
     }
