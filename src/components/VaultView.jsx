@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Plus, 
   Lock, 
@@ -17,7 +17,8 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  BookOpen
 } from 'lucide-react';
 import LetterCard from './LetterCard';
 import MissYouWidget from './MissYouWidget';
@@ -36,9 +37,11 @@ export default function VaultView({
   onOpenTimeline,
   onOpenBucketList,
   onOpenPrayers,
+  onOpenKnowMeFacility,
   isLettersUnlocked = false,
   bucketItems = [],
-  prayers = []
+  prayers = [],
+  knowMeAnswers = []
 }) {
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'important' | 'drafts'
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
@@ -141,6 +144,45 @@ export default function VaultView({
       setLastSeenPrayerTime(now);
     } catch (e) {}
     if (onOpenPrayers) onOpenPrayers();
+  };
+
+  // 4. Track Seen Partner Know-Me Answers (Our Little Book of Us)
+  const partnerKnowMeAnswers = useMemo(() => {
+    return knowMeAnswers.filter(a => a.authorId && a.authorId !== currentUserId);
+  }, [knowMeAnswers, currentUserId]);
+
+  const [lastSeenKnowMeTime, setLastSeenKnowMeTime] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`lfl_seen_partner_knowme_${currentUserId}`);
+      return stored !== null ? Number(stored) : Date.now();
+    } catch (e) {
+      return Date.now();
+    }
+  });
+
+  const hasNewPartnerKnowMe = useMemo(() => {
+    return partnerKnowMeAnswers.some(a => {
+      const createdTime = new Date(a.createdAtIso || 0).getTime();
+      return createdTime > lastSeenKnowMeTime;
+    });
+  }, [partnerKnowMeAnswers, lastSeenKnowMeTime]);
+
+  const handleOpenKnowMeWithSeen = () => {
+    try {
+      const now = Date.now();
+      localStorage.setItem(`lfl_seen_partner_knowme_${currentUserId}`, now);
+      setLastSeenKnowMeTime(now);
+    } catch (e) {}
+    if (onOpenKnowMeFacility) onOpenKnowMeFacility();
+  };
+
+  const cardsCarouselRef = useRef(null);
+
+  const scrollCards = (direction) => {
+    if (cardsCarouselRef.current) {
+      const scrollAmount = direction === 'left' ? -260 : 260;
+      cardsCarouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
   };
 
   // Filtered & Sorted list (Default: Newest First)
@@ -251,160 +293,212 @@ export default function VaultView({
         </div>
       </div>
 
-      {/* Pair Stats, Bucket List, Daily Prayer & Write Action Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        
-        {/* User Letter Count Card */}
-        <div className="bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-4 rounded-2xl shadow-sm flex items-center gap-3">
-          <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
-            <PenTool className="w-4 h-4 sm:w-5 sm:h-5 text-[#F8E3B6]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Your Letters</p>
-            <p className="text-lg sm:text-2xl font-bold font-serif text-[#36271C]">
-              {myLetters.filter(l => !l.isDraft).length} <span className="text-[10px] sm:text-xs font-normal text-[#9E8B75]">sealed</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Partner Letter Count Card */}
-        <div 
-          onClick={handlePartnerLettersClick}
-          className="relative bg-[#FDFBF7] border border-[#E2D7C7] p-3 sm:p-4 rounded-2xl shadow-sm flex items-center gap-3 transition-all cursor-pointer hover:border-[#D4AF37]"
+      {/* ─── FEATURE CARDS: ONE-ROW HORIZONTAL SNAP CAROUSEL ─── */}
+      <div className="relative group/carousel">
+        {/* Left Scroll Chevron (Desktop) */}
+        <button
+          type="button"
+          onClick={() => scrollCards('left')}
+          className="hidden md:flex absolute -left-3 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 hover:bg-white border border-[#D2C3B0] text-[#36271C] shadow-md items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity cursor-pointer"
+          title="Scroll left"
         >
-          {hasNewPartnerLetters && (
-            <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New letter from partner">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
-            </span>
-          )}
-          <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
-            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-[#F8E3B6]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">
-              {(() => {
-                const u2 = getNickname(pairInfo?.user2?.name) || 'Partner';
-                const me = getNickname(currentUser?.displayName);
-                return me === u2 ? 'Jay' : u2;
-              })()}'s
-            </p>
-            <p className="text-lg sm:text-2xl font-bold font-serif text-[#36271C]">
-              {partnerLetters.length} <span className="text-[10px] sm:text-xs font-normal text-rose-700 font-semibold">waiting</span>
-            </p>
-          </div>
-        </div>
+          <ChevronLeft className="w-4 h-4" />
+        </button>
 
-        {/* Our Bucket List Action Card */}
-        {onOpenBucketList && (
-          <button
-            type="button"
-            onClick={handleOpenBucketListWithSeen}
-            className="relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-3 sm:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center gap-3 text-left cursor-pointer group"
-          >
-            {hasNewPartnerBucketItems && (
-              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New wish added by partner">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
-              </span>
-            )}
-            <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 group-hover:scale-105 transition-transform shadow-xs">
-              ✨
+        {/* The Carousel Track */}
+        <div 
+          ref={cardsCarouselRef}
+          className="flex gap-2.5 sm:gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar py-1 items-stretch pe-4"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {/* CARD 1: User Letter Count Card */}
+          <div className="w-[150px] sm:w-[175px] md:w-[195px] lg:flex-1 shrink-0 snap-start bg-[#FDFBF7] border border-[#E2D7C7] p-2.5 sm:p-3.5 rounded-2xl shadow-xs flex items-center gap-2.5 sm:gap-3">
+            <div className="wax-seal w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
+              <PenTool className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#F8E3B6]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Our Bucket List</p>
-              <p className="text-sm sm:text-base font-bold font-serif-vintage text-[#36271C] truncate">
-                {bucketItems.length > 0 ? `${bucketItems.filter(i => i.isCompleted).length}/${bucketItems.length} Goals` : 'Our Fantasies'}
+              <p className="text-[9px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Your Letters</p>
+              <p className="text-sm sm:text-lg lg:text-2xl font-bold font-serif text-[#36271C]">
+                {myLetters.filter(l => !l.isDraft).length} <span className="text-[9px] sm:text-xs font-normal text-[#9E8B75]">sealed</span>
               </p>
             </div>
-          </button>
-        )}
+          </div>
 
-        {/* Prayer Request Action Card */}
-        {onOpenPrayers && (
-          <button
-            type="button"
-            onClick={handleOpenPrayersWithSeen}
-            className="relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-3 sm:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center gap-3 text-left cursor-pointer group"
+          {/* CARD 2: Partner Letter Count Card */}
+          <div 
+            onClick={handlePartnerLettersClick}
+            className="w-[150px] sm:w-[175px] md:w-[195px] lg:flex-1 shrink-0 snap-start relative bg-[#FDFBF7] border border-[#E2D7C7] p-2.5 sm:p-3.5 rounded-2xl shadow-xs flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer hover:border-[#D4AF37]"
           >
-            {hasNewPrayerActivity && (
-              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New prayer activity">
+            {hasNewPartnerLetters && (
+              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New letter from partner">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
               </span>
             )}
-            <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 group-hover:scale-105 transition-transform shadow-xs">
-              🙏
+            <div className="wax-seal w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm shrink-0 shadow-xs flex items-center justify-center text-[#F8E3B6]">
+              <Lock className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#F8E3B6]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Prayer Request</p>
-              <p className="text-sm sm:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+              <p className="text-[9px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">
                 {(() => {
-                  const now = Date.now();
-                  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-                  const active = prayers.filter(p => !p.isArchived && (now - new Date(p.createdAtIso || 0).getTime() <= TWENTY_FOUR_HOURS));
-                  if (active.length > 0) {
-                    return `${active.length} ${active.length === 1 ? 'Request' : 'Requests'}`;
-                  }
-                  return 'Add Request';
-                })()}
+                  const u2 = getNickname(pairInfo?.user2?.name) || 'Partner';
+                  const me = getNickname(currentUser?.displayName);
+                  return me === u2 ? 'Jay' : u2;
+                })()}'s
+              </p>
+              <p className="text-sm sm:text-lg lg:text-2xl font-bold font-serif text-[#36271C]">
+                {partnerLetters.length} <span className="text-[9px] sm:text-xs font-normal text-rose-700 font-semibold">waiting</span>
               </p>
             </div>
-          </button>
-        )}
+          </div>
 
-        {/* Write Letter & Timeline Actions Column */}
-        <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-          {/* Write Letter Action Button */}
-          <button
-            onClick={onWriteNew}
-            className="w-full bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] p-2.5 sm:p-3 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 group border border-[#D4AF37]/50 cursor-pointer"
-          >
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#8B0000] border border-[#F8E3B6]/40 flex items-center justify-center text-[#F8E3B6] group-hover:rotate-12 transition-transform shrink-0">
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </div>
-            <span className="text-xs sm:text-sm font-bold text-[#F8E3B6]">Write Letter for Later</span>
-          </button>
-
-          {/* Locked Timeline Button directly below Write Letter — matching exact size & height */}
-          <button
-            type="button"
-            onClick={onOpenTimeline}
-            disabled={!countdown.isUnlocked}
-            className={`w-full p-2.5 sm:p-3 rounded-xl transition-all flex items-center justify-center gap-2 border ${
-              !countdown.isUnlocked
-                ? 'bg-[#EFE9DE]/90 text-[#9E8B75] border-[#D2C3B0]/60 cursor-not-allowed opacity-80'
-                : isLettersUnlocked
-                  ? 'bg-[#D4AF37] hover:bg-[#AA7C11] text-[#3D2600] border-[#AA7C11]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
-                  : 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border-[#D4AF37]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
-            }`}
-            title={!countdown.isUnlocked ? 'Timeline remains locked until August 6, 2032' : 'View Unlocked Timeline'}
-          >
-            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border flex items-center justify-center shrink-0 ${
-              !countdown.isUnlocked
-                ? 'bg-[#E4DCD0] border-[#D2C3B0] text-[#9E8B75]'
-                : isLettersUnlocked
-                  ? 'bg-[#AA7C11] border-[#F8E3B6]/40 text-[#F8E3B6]'
-                  : 'bg-[#8B0000] border-[#F8E3B6]/40 text-[#F8E3B6]'
-            }`}>
-              {!countdown.isUnlocked ? (
-                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              ) : isLettersUnlocked ? (
-                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              ) : (
-                <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {/* CARD 3: Our Little Book of Us Card */}
+          {onOpenKnowMeFacility && (
+            <button
+              type="button"
+              onClick={handleOpenKnowMeWithSeen}
+              className="w-[150px] sm:w-[175px] md:w-[195px] lg:flex-1 shrink-0 snap-start relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-2.5 sm:p-3.5 rounded-2xl shadow-xs hover:shadow-md transition-all flex items-center gap-2.5 sm:gap-3 text-left cursor-pointer group"
+            >
+              {hasNewPartnerKnowMe && (
+                <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New answer from partner in Our Book">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+                </span>
               )}
-            </div>
-            <span className="text-xs sm:text-sm font-bold truncate">
-              {!countdown.isUnlocked 
-                ? 'Locked Until The Right Time' 
-                : isLettersUnlocked 
-                  ? 'Unlocked Timeline' 
-                  : 'Reveal All The Letters'}
-            </span>
-          </button>
+              <div className="wax-seal w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm shrink-0 group-hover:scale-105 transition-transform shadow-xs flex items-center justify-center">
+                📖
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Our Book of Us</p>
+                <p className="text-xs sm:text-sm lg:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+                  {knowMeAnswers.length > 0 ? `${knowMeAnswers.length} Logged` : 'Our Book'}
+                </p>
+              </div>
+            </button>
+          )}
+
+          {/* CARD 4: Our Bucket List Action Card */}
+          {onOpenBucketList && (
+            <button
+              type="button"
+              onClick={handleOpenBucketListWithSeen}
+              className="w-[150px] sm:w-[175px] md:w-[195px] lg:flex-1 shrink-0 snap-start relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-2.5 sm:p-3.5 rounded-2xl shadow-xs hover:shadow-md transition-all flex items-center gap-2.5 sm:gap-3 text-left cursor-pointer group"
+            >
+              {hasNewPartnerBucketItems && (
+                <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New wish added by partner">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+                </span>
+              )}
+              <div className="wax-seal w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm shrink-0 group-hover:scale-105 transition-transform shadow-xs flex items-center justify-center">
+                ✨
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Bucket List</p>
+                <p className="text-xs sm:text-sm lg:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+                  {bucketItems.length > 0 ? `${bucketItems.filter(i => i.isCompleted).length}/${bucketItems.length} Goals` : 'Our Wishes'}
+                </p>
+              </div>
+            </button>
+          )}
+
+          {/* CARD 5: Prayer Request Action Card */}
+          {onOpenPrayers && (
+            <button
+              type="button"
+              onClick={handleOpenPrayersWithSeen}
+              className="w-[150px] sm:w-[175px] md:w-[195px] lg:flex-1 shrink-0 snap-start relative bg-[#FDFBF7] hover:bg-[#FAF5EC] border border-[#D2C3B0] hover:border-[#D4AF37] p-2.5 sm:p-3.5 rounded-2xl shadow-xs hover:shadow-md transition-all flex items-center gap-2.5 sm:gap-3 text-left cursor-pointer group"
+            >
+              {hasNewPrayerActivity && (
+                <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5" title="New prayer activity">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#A83232] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#A83232] border border-white shadow-xs"></span>
+                </span>
+              )}
+              <div className="wax-seal w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base shrink-0 group-hover:scale-105 transition-transform shadow-xs flex items-center justify-center">
+                🙏
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-[#9E8B75] uppercase font-bold tracking-wider truncate">Prayer Request</p>
+                <p className="text-sm sm:text-base font-bold font-serif-vintage text-[#36271C] truncate">
+                  {(() => {
+                    const now = Date.now();
+                    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+                    const active = prayers.filter(p => !p.isArchived && (now - new Date(p.createdAtIso || 0).getTime() <= TWENTY_FOUR_HOURS));
+                    if (active.length > 0) {
+                      return `${active.length} ${active.length === 1 ? 'Request' : 'Requests'}`;
+                    }
+                    return 'Add Request';
+                  })()}
+                </p>
+              </div>
+            </button>
+          )}
         </div>
 
+        {/* Right Scroll Chevron (Desktop) */}
+        <button
+          type="button"
+          onClick={() => scrollCards('right')}
+          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 hover:bg-white border border-[#D2C3B0] text-[#36271C] shadow-md items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity cursor-pointer"
+          title="Scroll right"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* ─── ANCHORED PRIMARY ACTIONS (Always prominent below the carousel) ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
+        {/* Write Letter Action Button */}
+        <button
+          onClick={onWriteNew}
+          className="w-full bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] p-3 sm:p-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2.5 group border border-[#D4AF37]/50 cursor-pointer"
+        >
+          <div className="w-7 h-7 rounded-full bg-[#8B0000] border border-[#F8E3B6]/40 flex items-center justify-center text-[#F8E3B6] group-hover:rotate-12 transition-transform shrink-0">
+            <Plus className="w-4 h-4" />
+          </div>
+          <span className="text-sm sm:text-base font-bold text-[#F8E3B6] font-serif-vintage">
+            Write Letter for Later
+          </span>
+        </button>
+
+        {/* Locked Timeline Button */}
+        <button
+          type="button"
+          onClick={onOpenTimeline}
+          disabled={!countdown.isUnlocked}
+          className={`w-full p-3 sm:p-3.5 rounded-2xl transition-all flex items-center justify-center gap-2.5 border ${
+            !countdown.isUnlocked
+              ? 'bg-[#EFE9DE]/90 text-[#9E8B75] border-[#D2C3B0]/60 cursor-not-allowed opacity-80'
+              : isLettersUnlocked
+                ? 'bg-[#D4AF37] hover:bg-[#AA7C11] text-[#3D2600] border-[#AA7C11]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
+                : 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border-[#D4AF37]/50 cursor-pointer shadow-md transform hover:-translate-y-0.5'
+          }`}
+          title={!countdown.isUnlocked ? 'Timeline remains locked until August 6, 2032' : 'View Unlocked Timeline'}
+        >
+          <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 ${
+            !countdown.isUnlocked
+              ? 'bg-[#E4DCD0] border-[#D2C3B0] text-[#9E8B75]'
+              : isLettersUnlocked
+                ? 'bg-[#AA7C11] border-[#F8E3B6]/40 text-[#F8E3B6]'
+                : 'bg-[#8B0000] border-[#F8E3B6]/40 text-[#F8E3B6]'
+          }`}>
+            {!countdown.isUnlocked ? (
+              <Lock className="w-4 h-4" />
+            ) : isLettersUnlocked ? (
+              <Sparkles className="w-4 h-4" />
+            ) : (
+              <Key className="w-4 h-4" />
+            )}
+          </div>
+          <span className="text-sm sm:text-base font-bold truncate font-serif-vintage">
+            {!countdown.isUnlocked 
+              ? 'Locked Until The Right Time' 
+              : isLettersUnlocked 
+                ? 'Unlocked Timeline' 
+                : 'Reveal All The Letters'}
+          </span>
+        </button>
       </div>
 
       {/* Real-time "I Miss You" Interactive Counter Widget */}

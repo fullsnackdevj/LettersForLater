@@ -23,7 +23,8 @@ import DailyPrayerModal from './components/DailyPrayerModal';
 import CallPromptModal from './components/CallPromptModal';
 import CallModal from './components/CallModal';
 import MessengerModal from './components/MessengerModal';
-import { Lock, Sparkles, Key } from 'lucide-react';
+import RandomQuestionModal from './components/RandomQuestionModal';
+import KnowMeFacilityModal from './components/KnowMeFacilityModal';
 
 import { 
   listenForIncomingCalls, 
@@ -41,7 +42,6 @@ import {
   signInWithGoogle, 
   signOutUser, 
   subscribeToAuth, 
-  getPairInfo, 
   savePairInfo, 
   saveLetterToCloud, 
   deleteLetterFromCloud, 
@@ -73,10 +73,15 @@ import {
   markChatMessagesAsSeen,
   reactToChatMessage,
   deleteChatMessage,
-  updateChatMessage
+  updateChatMessage,
+  saveKnowMeAnswer,
+  updateKnowMeAnswer,
+  deleteKnowMeAnswer,
+  reactToKnowMeAnswer,
+  subscribeToKnowMeAnswers
 } from './services/firebase';
 
-import { getCountdownToTarget } from './utils/pht';
+import { getCountdownToTarget, getTodayPHTKey, getCurrentPHT } from './utils/pht';
 import { getNickname } from './utils/nicknames';
 import { isMessageReadByMe, getLastReadChatTimestamp, setLastReadChatTimestamp } from './utils/chatUtils';
 
@@ -139,6 +144,11 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [lastReadChatTimestamp, setLastReadChatTimestampState] = useState(0);
+
+  // Our Little Book of Us ("Know-Me" Questions & Answers)
+  const [knowMeAnswers, setKnowMeAnswers] = useState([]);
+  const [isRandomQuestionOpen, setIsRandomQuestionOpen] = useState(false);
+  const [isKnowMeFacilityOpen, setIsKnowMeFacilityOpen] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState(null);
 
@@ -246,6 +256,59 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Know-Me Answers ("Our Little Book of Us")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToKnowMeAnswers(pairCode, (fetchedAnswers) => {
+      setKnowMeAnswers(fetchedAnswers || []);
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Gentle Startup Question Prompt: Only ONE question pops up per day automatically,
+  // unless user manually chooses to open or answer another question.
+  useEffect(() => {
+    if (isAppUnlocked && !isAuthOpen) {
+      const todayKey = getTodayPHTKey();
+      const pairCode = (pairInfo?.code || '#JayFinallyGotAKiss').toUpperCase();
+      const curUserId = user?.uid || 'demo-user-1';
+      const promptStorageKey = `lfl_know_me_last_pop_${pairCode}_${curUserId}`;
+
+      // 1. Check if user was already prompted today
+      const lastPromptDate = localStorage.getItem(promptStorageKey);
+      if (lastPromptDate === todayKey) {
+        return;
+      }
+
+      // 2. Check if user already answered a question today
+      const hasAnsweredToday = knowMeAnswers.some(a => {
+        if (a.authorId !== curUserId) return false;
+        if (a.createdAtIso && a.createdAtIso.startsWith(todayKey)) return true;
+        const currentPhtDate = getCurrentPHT().dateString;
+        if (a.createdAtPHT && a.createdAtPHT.includes(currentPhtDate)) return true;
+        return false;
+      });
+
+      if (hasAnsweredToday) {
+        // Mark as popped today so it won't prompt again today
+        try {
+          localStorage.setItem(promptStorageKey, todayKey);
+        } catch (e) {}
+        return;
+      }
+
+      // 3. Trigger exactly one gentle pop-up for today (after 3.5s delay)
+      const timer = setTimeout(() => {
+        setIsRandomQuestionOpen(true);
+        try {
+          localStorage.setItem(promptStorageKey, todayKey);
+        } catch (e) {}
+      }, 3500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isAppUnlocked, isAuthOpen, knowMeAnswers, pairInfo?.code, user?.uid]);
 
   // Subscribe to Realtime Presence Map ("Who is Online")
   useEffect(() => {
@@ -884,6 +947,56 @@ export default function App() {
     setPrayers(prev => prev.filter(p => p.id !== requestId));
   }, [pairInfo?.code]);
 
+  // Know-Me Prompts ("Our Little Book of Us") Handlers
+  const handleSaveKnowMeAnswer = useCallback(async (answerData) => {
+    const pairCode = (pairInfo?.code || '#JayFinallyGotAKiss').toUpperCase();
+    const currentUser = user || { uid: 'demo-user-1', displayName: 'Jay' };
+    const curUserId = currentUser.uid || 'demo-user-1';
+
+    // Record that a prompt was answered today so it won't auto-pop again today
+    try {
+      localStorage.setItem(`lfl_know_me_last_pop_${pairCode}_${curUserId}`, getTodayPHTKey());
+    } catch (e) {}
+
+    const saved = await saveKnowMeAnswer(pairCode, currentUser, answerData);
+    if (saved) {
+      setKnowMeAnswers(prev => {
+        const idx = prev.findIndex(a => a.id === saved.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved;
+          return copy;
+        }
+        return [saved, ...prev];
+      });
+    }
+    return saved;
+  }, [pairInfo?.code, user]);
+
+  const handleUpdateKnowMeAnswer = useCallback(async (answerId, newText) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const updated = await updateKnowMeAnswer(pairCode, answerId, newText);
+    if (updated) {
+      setKnowMeAnswers(prev => prev.map(a => a.id === answerId ? { ...a, ...updated } : a));
+    }
+    return updated;
+  }, [pairInfo?.code]);
+
+  const handleDeleteKnowMeAnswer = useCallback(async (answerId) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await deleteKnowMeAnswer(pairCode, answerId);
+    setKnowMeAnswers(prev => prev.filter(a => a.id !== answerId));
+  }, [pairInfo?.code]);
+
+  const handleReactToKnowMeAnswer = useCallback(async (answerId, emoji) => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const currentUser = user || { uid: 'demo-user-1', displayName: 'Jay' };
+    const newReactions = await reactToKnowMeAnswer(pairCode, answerId, currentUser, emoji);
+    if (newReactions) {
+      setKnowMeAnswers(prev => prev.map(a => a.id === answerId ? { ...a, reactions: newReactions } : a));
+    }
+  }, [pairInfo?.code, user]);
+
   // Couple Messenger / Chat Handlers
   const handleOpenMessenger = useCallback(() => {
     setIsMessengerOpen(true);
@@ -978,6 +1091,7 @@ export default function App() {
         onOpenBucketList={() => setIsBucketListOpen(true)}
         onOpenCallPrompt={() => setIsCallPromptOpen(true)}
         onOpenMessenger={handleOpenMessenger}
+        onOpenKnowMeFacility={() => setIsKnowMeFacilityOpen(true)}
       />
 
       {/* Couple Live Status Ribbon ("What We're Currently Doing") */}
@@ -1031,6 +1145,8 @@ export default function App() {
             onOpenTimeline={handleTimelineButtonClick}
             onOpenBucketList={() => setIsBucketListOpen(true)}
             onOpenPrayers={() => setIsPrayersOpen(true)}
+            onOpenKnowMeFacility={() => setIsKnowMeFacilityOpen(true)}
+            knowMeAnswers={knowMeAnswers}
             prayers={prayers}
           />
         )}
@@ -1234,6 +1350,39 @@ export default function App() {
         onSavePrayer={handleSavePrayerRequest}
         onMarkPrayed={handleMarkPrayerAsPrayed}
         onDeletePrayer={handleDeletePrayerRequest}
+      />
+
+      {/* Random Question Prompt Dialog (Startup / On-Demand) */}
+      <RandomQuestionModal
+        isOpen={isRandomQuestionOpen}
+        onClose={() => {
+          setIsRandomQuestionOpen(false);
+          const todayKey = getTodayPHTKey();
+          const pairCode = (pairInfo?.code || '#JayFinallyGotAKiss').toUpperCase();
+          const curUserId = user?.uid || 'demo-user-1';
+          try {
+            localStorage.setItem(`lfl_know_me_last_pop_${pairCode}_${curUserId}`, todayKey);
+          } catch (e) {}
+        }}
+        currentUser={user}
+        pairInfo={pairInfo}
+        existingAnswers={knowMeAnswers}
+        onSaveAnswer={handleSaveKnowMeAnswer}
+        onOpenFacility={() => setIsKnowMeFacilityOpen(true)}
+      />
+
+      {/* Our Little Book of Us (Know-Me Note Facility Modal) */}
+      <KnowMeFacilityModal
+        isOpen={isKnowMeFacilityOpen}
+        onClose={() => setIsKnowMeFacilityOpen(false)}
+        currentUser={user}
+        pairInfo={pairInfo}
+        answers={knowMeAnswers}
+        onUpdateAnswer={handleUpdateKnowMeAnswer}
+        onDeleteAnswer={handleDeleteKnowMeAnswer}
+        onReactAnswer={handleReactToKnowMeAnswer}
+        onOpenQuestionPrompt={() => setIsRandomQuestionOpen(true)}
+        onAddCustomPrompt={handleSaveKnowMeAnswer}
       />
 
       {/* App Startup Gatekeeper Lock Modal */}

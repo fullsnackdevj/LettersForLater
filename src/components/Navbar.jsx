@@ -15,7 +15,8 @@ import {
   Phone,
   MessageCircleHeart,
   ExternalLink,
-  FolderHeart
+  FolderHeart,
+  ChevronRight
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -42,7 +43,8 @@ export default function Navbar({
   onOpenStatusDetail,
   onOpenBucketList,
   onOpenCallPrompt,
-  onOpenMessenger
+  onOpenMessenger,
+  onOpenKnowMeFacility
 }) {
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));
@@ -261,21 +263,21 @@ export default function Navbar({
               )}
             </div>
 
-            {/* Memory Log / Story Archive Circular Button */}
-            <div className="relative group shrink-0">
-              <button
-                type="button"
-                onClick={onOpenStoryArchive}
-                className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-dashed border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
-                title="View private Story Archive & Memory Log"
-              >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-white flex items-center justify-center text-[#A83232] transition-colors shadow-xs">
-                  <BookOpen className="w-4 h-4 text-[#A83232]" />
-                </div>
-              </button>
-            </div>
+              {/* Memory Log / Story Archive Circular Button */}
+              <div className="relative group shrink-0">
+                <button
+                  type="button"
+                  onClick={onOpenStoryArchive}
+                  className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-dashed border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
+                  title="View private Story Archive & Memory Log"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-white flex items-center justify-center text-[#A83232] transition-colors shadow-xs">
+                    <BookOpen className="w-4 h-4 text-[#A83232]" />
+                  </div>
+                </button>
+              </div>
 
-            {/* Call Partner Button */}
+              {/* Call Partner Button */}
             {onOpenCallPrompt && (
               <div className="relative group shrink-0">
                 <button
@@ -442,80 +444,124 @@ export default function Navbar({
                       </div>
                     </div>
 
-                    {/* Chat Sanctuary in Profile Menu */}
-                    {onOpenMessenger && (
+                    {/* Navigation Menu Items (Clean Grouped List) */}
+                    <div className="pt-2 space-y-0.5">
+                      {/* Our Little Book of Us */}
+                      {onOpenKnowMeFacility && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            onOpenKnowMeFacility();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group text-left"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-sm shadow-2xs shrink-0">
+                              📖
+                            </div>
+                            <span className="font-medium truncate">Our Book of Us</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />
+                        </button>
+                      )}
+
+                      {/* Chat Sanctuary */}
+                      {onOpenMessenger && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            onOpenMessenger();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group text-left"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-[#A83232] shadow-2xs shrink-0">
+                              <MessageCircleHeart className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="font-medium truncate">Chat Sanctuary</span>
+                          </div>
+                          {unreadMessageCount > 0 ? (
+                            <span className="bg-[#A83232] text-[#F8E3B6] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shadow-2xs shrink-0">
+                              {unreadMessageCount} new
+                            </span>
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />
+                          )}
+                        </button>
+                      )}
+
+                      {/* Call Partner */}
+                      {onOpenCallPrompt && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            onOpenCallPrompt();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group text-left"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-[#A83232] shadow-2xs shrink-0">
+                              <Video className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="font-medium truncate">Call {partnerName}</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />
+                        </button>
+                      )}
+
+                      {/* How It Works & Info */}
                       <button
                         type="button"
                         onClick={() => {
                           setIsProfileOpen(false);
-                          onOpenMessenger();
+                          onOpenInfo();
                         }}
-                        className="w-full mt-2.5 flex items-center justify-between py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#36271C] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group text-left"
                       >
-                        <div className="flex items-center gap-2">
-                          <MessageCircleHeart className="w-3.5 h-3.5 text-[#A83232]" />
-                          <span>Chat Sanctuary</span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-[#A83232] shadow-2xs shrink-0">
+                            <HelpCircle className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="font-medium truncate">How It Works & Info</span>
                         </div>
-                        {unreadMessageCount > 0 && (
-                          <span className="bg-[#A83232] text-[#F8E3B6] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shadow-2xs">
-                            {unreadMessageCount} new
-                          </span>
-                        )}
+                        <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />
                       </button>
-                    )}
 
-                    {/* Call Partner in Profile Menu */}
-                    {onOpenCallPrompt && (
+                      {/* Google Drive Link */}
+                      <a
+                        href="https://drive.google.com/drive/folders/16zf1NeDt3F-OJDSGYYnbUpxCTf-VazB1?usp=sharing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group no-underline text-left"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-[#A83232] shadow-2xs shrink-0">
+                            <FolderHeart className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="font-medium truncate">Open Google Drive</span>
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] shrink-0" />
+                      </a>
+                    </div>
+
+                    {/* Sign Out Row */}
+                    <div className="pt-2 mt-2 border-t border-[#EFE9DE]">
                       <button
                         type="button"
                         onClick={() => {
                           setIsProfileOpen(false);
-                          onOpenCallPrompt();
+                          onSignOut();
                         }}
-                        className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] border border-[#D4AF37]/50 rounded-xl transition-all font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50/70 rounded-xl transition-colors cursor-pointer"
                       >
-                        <Video className="w-3.5 h-3.5 text-[#F8E3B6]" />
-                        <span>Call {partnerName}</span>
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
                       </button>
-                    )}
-
-                    {/* How It Works & App Guide in Profile */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProfileOpen(false);
-                        onOpenInfo();
-                      }}
-                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
-                    >
-                      <HelpCircle className="w-3.5 h-3.5 text-[#A83232]" />
-                      <span>How It Works & Info</span>
-                    </button>
-
-                    {/* Google Drive Link */}
-                    <a
-                      href="https://drive.google.com/drive/folders/16zf1NeDt3F-OJDSGYYnbUpxCTf-VazB1?usp=sharing"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-[#EFE9DE] text-[#4A3B2C] border border-[#D2C3B0] rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95 no-underline"
-                    >
-                      <FolderHeart className="w-3.5 h-3.5 text-[#A83232]" />
-                      <span>Open Google Drive</span>
-                      <ExternalLink className="w-3 h-3 text-[#9E8B75]" />
-                    </a>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProfileOpen(false);
-                        onSignOut();
-                      }}
-                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF5EC] hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl transition-colors font-semibold cursor-pointer text-xs shadow-xs active:scale-95"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      Sign Out
-                    </button>
+                    </div>
                   </div>
                 </>
               )}

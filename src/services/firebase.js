@@ -21,6 +21,7 @@ import {
 import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentPHT } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
+import { translateToEnglish } from '../utils/translator';
 
 // Firebase configuration (Loaded from import.meta.env or fallback)
 const firebaseConfig = {
@@ -1773,3 +1774,229 @@ export async function updateChatMessage(pairCode, messageId, updatedText) {
   }
   return null;
 }
+
+// ─────────────────────────────────────────────────────────────
+// OUR LITTLE BOOK OF US ("KNOW-ME" QUESTIONS & ANSWERS)
+// ─────────────────────────────────────────────────────────────
+
+const LOCAL_KNOW_ME_KEY = 'lettersforlater_know_me_answers';
+let inMemoryKnowMeStore = null;
+
+export function getLocalKnowMeAnswers() {
+  if (inMemoryKnowMeStore !== null) {
+    return inMemoryKnowMeStore;
+  }
+  try {
+    const data = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_KNOW_ME_KEY) : null;
+    if (data) {
+      inMemoryKnowMeStore = JSON.parse(data);
+      return inMemoryKnowMeStore;
+    }
+  } catch (e) {
+    console.warn('Error reading know-me answers from localStorage:', e);
+  }
+  inMemoryKnowMeStore = [];
+  return inMemoryKnowMeStore;
+}
+
+export function saveLocalKnowMeAnswers(list) {
+  inMemoryKnowMeStore = [...list];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_KNOW_ME_KEY, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('LocalStorage quota or write error for know-me answers:', e);
+  }
+}
+
+export async function saveKnowMeAnswer(pairCode, user, answerData) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+  const currentUserId = user?.uid || 'demo-user-1';
+  const authorName = getNickname(user?.displayName) || (currentUserId === 'demo-user-1' ? 'Jay' : 'Kiss');
+  const authorPhoto = user?.photoURL || '';
+
+  const newDocId = `km_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Automatically attempt translation into English
+  let translatedText = '';
+  try {
+    translatedText = await translateToEnglish(answerData.answerText || '');
+  } catch (err) {}
+
+  const newEntry = {
+    id: newDocId,
+    questionId: answerData.questionId || `custom_${Date.now()}`,
+    questionText: answerData.questionText || '',
+    category: answerData.category || 'favorites',
+    answerText: answerData.answerText || '',
+    translatedText: translatedText || '',
+    authorId: currentUserId,
+    authorName,
+    authorPhoto,
+    isCustomQuestion: Boolean(answerData.isCustomQuestion),
+    reactions: {},
+    createdAtIso: pht.isoString,
+    createdAtPHT: pht.fullString
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const docRef = doc(db, 'pairs', cleanCode, 'knowMeAnswers', newDocId);
+      await setDoc(docRef, newEntry);
+    } catch (err) {
+      console.warn('Failed saving know-me answer to Firestore, storing locally:', err);
+    }
+  }
+
+  // Update local store
+  const localList = getLocalKnowMeAnswers();
+  localList.unshift(newEntry);
+  saveLocalKnowMeAnswers(localList);
+
+  return newEntry;
+}
+
+export async function updateKnowMeAnswer(pairCode, answerId, updatedText) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const pht = getCurrentPHT();
+
+  // Re-translate on update
+  let translatedText = '';
+  try {
+    translatedText = await translateToEnglish(updatedText || '');
+  } catch (err) {}
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const docRef = doc(db, 'pairs', cleanCode, 'knowMeAnswers', answerId);
+      await updateDoc(docRef, {
+        answerText: updatedText,
+        translatedText: translatedText || '',
+        isEdited: true,
+        updatedAtIso: pht.isoString,
+        updatedAtPHT: pht.fullString
+      });
+    } catch (err) {
+      console.warn('Error updating know-me answer in Firestore:', err);
+    }
+  }
+
+  const localList = getLocalKnowMeAnswers();
+  const idx = localList.findIndex(a => a.id === answerId);
+  if (idx >= 0) {
+    localList[idx].answerText = updatedText;
+    localList[idx].translatedText = translatedText || '';
+    localList[idx].isEdited = true;
+    localList[idx].updatedAtIso = pht.isoString;
+    saveLocalKnowMeAnswers(localList);
+    return localList[idx];
+  }
+  return null;
+}
+
+export async function deleteKnowMeAnswer(pairCode, answerId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await deleteDoc(doc(db, 'pairs', cleanCode, 'knowMeAnswers', answerId));
+    } catch (err) {
+      console.warn('Error deleting know-me answer from Firestore:', err);
+    }
+  }
+
+  const localList = getLocalKnowMeAnswers().filter(a => a.id !== answerId);
+  saveLocalKnowMeAnswers(localList);
+}
+
+export async function reactToKnowMeAnswer(pairCode, answerId, user, emoji) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const currentUserId = user?.uid || 'demo-user-1';
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const docRef = doc(db, 'pairs', cleanCode, 'knowMeAnswers', answerId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const existingReactions = snap.data().reactions || {};
+        const currentReactionsForUser = existingReactions[currentUserId] || [];
+
+        let updatedUserReactions;
+        if (currentReactionsForUser.includes(emoji)) {
+          updatedUserReactions = currentReactionsForUser.filter(e => e !== emoji);
+        } else {
+          updatedUserReactions = [...currentReactionsForUser, emoji];
+        }
+
+        const newReactions = { ...existingReactions };
+        if (updatedUserReactions.length === 0) {
+          delete newReactions[currentUserId];
+        } else {
+          newReactions[currentUserId] = updatedUserReactions;
+        }
+
+        await updateDoc(docRef, { reactions: newReactions });
+        return newReactions;
+      }
+    } catch (err) {
+      console.warn('Error updating reaction to know-me answer in Firestore:', err);
+    }
+  }
+
+  // Local fallback
+  const localList = getLocalKnowMeAnswers();
+  const target = localList.find(a => a.id === answerId);
+  if (target) {
+    if (!target.reactions) target.reactions = {};
+    const userReacts = target.reactions[currentUserId] || [];
+    if (userReacts.includes(emoji)) {
+      target.reactions[currentUserId] = userReacts.filter(e => e !== emoji);
+    } else {
+      target.reactions[currentUserId] = [...userReacts, emoji];
+    }
+    if (target.reactions[currentUserId].length === 0) {
+      delete target.reactions[currentUserId];
+    }
+    saveLocalKnowMeAnswers(localList);
+    return target.reactions;
+  }
+  return null;
+}
+
+export function subscribeToKnowMeAnswers(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+
+  // Initial local delivery
+  callback(getLocalKnowMeAnswers());
+
+  if (!isFirebaseConfigured || !db) {
+    return () => {};
+  }
+
+  try {
+    const q = query(
+      collection(db, 'pairs', cleanCode, 'knowMeAnswers'),
+      orderBy('createdAtIso', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const answers = [];
+      snapshot.forEach(docSnap => {
+        answers.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      saveLocalKnowMeAnswers(answers);
+      callback(answers);
+    }, (error) => {
+      console.warn('Error in knowMeAnswers realtime subscription:', error);
+      callback(getLocalKnowMeAnswers());
+    });
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Failed subscribing to knowMeAnswers:', err);
+    return () => {};
+  }
+}
+
