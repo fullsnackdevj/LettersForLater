@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   X, 
   Send, 
@@ -220,14 +220,87 @@ export default function MessengerModal({
     return pairInfo?.user2?.photo || '';
   }, [messages, currentUserId, currentUserName, user2Name, pairInfo, currentUser?.photoURL]);
 
-  // Auto-scroll to bottom
+  const isInitialOpenRef = useRef(true);
+  const prevMessagesCountRef = useRef(messages.length);
+
+  // Helper to scroll messages to bottom
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    if (chatAreaRef.current) {
+      if (behavior === 'smooth') {
+        chatAreaRef.current.scrollTo({
+          top: chatAreaRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+      }
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  }, []);
+
+  // Instant scroll on layout before paint when modal is opened
+  useLayoutEffect(() => {
+    if (isOpen && chatAreaRef.current) {
+      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+    }
+  }, [isOpen]);
+
+  // Handle modal open: keep pinned at bottom instantly across initial frames
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      isInitialOpenRef.current = true;
+      prevMessagesCountRef.current = messages.length;
+
+      // Immediate instant scroll
+      scrollToBottom('auto');
+
+      // Double-check on next animation frame
+      const frameId = requestAnimationFrame(() => {
+        scrollToBottom('auto');
+      });
+
+      // Settle initial open window after short duration
+      const timer = setTimeout(() => {
+        scrollToBottom('auto');
+        isInitialOpenRef.current = false;
+      }, 250);
+
+      return () => {
+        cancelAnimationFrame(frameId);
+        clearTimeout(timer);
+      };
+    } else {
+      isInitialOpenRef.current = true;
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen, scrollToBottom]);
+
+  // Handle new messages arriving while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // If still in initial open phase, keep it instantly at bottom without animation
+    if (isInitialOpenRef.current) {
+      scrollToBottom('auto');
+      prevMessagesCountRef.current = messages.length;
+      return;
+    }
+
+    // Only scroll if messages count increased (new message sent or received)
+    if (messages.length > prevMessagesCountRef.current) {
+      const chatEl = chatAreaRef.current;
+      const isNearBottom = chatEl 
+        ? (chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 180)
+        : true;
+
+      // If user is already near bottom, smoothly scroll to latest message
+      if (isNearBottom) {
+        scrollToBottom('smooth');
+      }
+    }
+
+    prevMessagesCountRef.current = messages.length;
+  }, [messages.length, isOpen, scrollToBottom]);
 
   // Show temporary toast
   const showToast = useCallback((msg) => {
@@ -400,7 +473,7 @@ export default function MessengerModal({
     } finally {
       setIsSending(false);
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollToBottom('smooth');
       }, 50);
     }
   };
