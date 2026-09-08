@@ -2,8 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { 
   Edit3, 
   Eye, 
-  MessageCircleHeart,
-  Video
+  MessageCircleHeart, 
+  Video,
+  ScrollText
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { getPresenceInfo } from '../utils/presence';
@@ -12,10 +13,12 @@ export default function CoupleStatusBanner({
   user,
   pairInfo,
   statuses = {},
+  statusHistory = [],
   partnerPresence,
   onOpenStatusPicker,
   onOpenStatusDetail,
-  onOpenCallPrompt
+  onOpenCallPrompt,
+  onOpenStatusHistory
 }) {
   if (!user) return null;
 
@@ -63,9 +66,44 @@ export default function CoupleStatusBanner({
     }
   }, [isPartnerStatusUnseen]);
 
+  const unreadHistoryCount = (statusHistory || []).filter(
+    n => n.userId !== currentUserId && !n.viewedBy?.includes(currentUserId)
+  ).length;
+
   return (
     <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] py-2 px-2.5 sm:px-4 select-none shadow-xs overflow-hidden">
       <div className="max-w-4xl mx-auto">
+
+        {/* Top Header Bar for Live Notes & History */}
+        <div className="flex items-center justify-between px-1 mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs">💭</span>
+            <span className="text-[10px] font-bold text-[#A83232] uppercase tracking-wider">
+              Couple Live Notes
+            </span>
+          </div>
+
+          {onOpenStatusHistory && (
+            <button
+              type="button"
+              onClick={onOpenStatusHistory}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white hover:bg-[#FDFBF7] border border-[#D2C3B0] hover:border-[#A83232] text-[#36271C] text-[10px] font-bold shadow-2xs transition-all cursor-pointer group active:scale-95"
+              title="View all past notes & memories"
+            >
+              <ScrollText className="w-3 h-3 text-[#A83232]" />
+              <span>Past Notes</span>
+              {unreadHistoryCount > 0 ? (
+                <span className="bg-[#A83232] text-[#F8E3B6] text-[9px] font-bold px-1.5 py-0.2 rounded-full shadow-2xs animate-pulse">
+                  {unreadHistoryCount} new
+                </span>
+              ) : statusHistory?.length > 0 ? (
+                <span className="text-[9px] text-[#9E8B75]">
+                  ({statusHistory.length})
+                </span>
+              ) : null}
+            </button>
+          )}
+        </div>
         
         {/* Horizontal Snap Carousel with Peek Effect */}
         <div 
@@ -288,6 +326,48 @@ export default function CoupleStatusBanner({
 
             </div>
           </div>
+
+          {/* ─────────────────────────────────────────────────────────────
+              CARD 3: PAST NOTES HISTORY SHORTCUT (CAROUSEL SLIDE)
+             ───────────────────────────────────────────────────────────── */}
+          {onOpenStatusHistory && (
+            <div className="w-[68%] sm:w-[50%] md:w-[35%] shrink-0 snap-start">
+              <div 
+                onClick={onOpenStatusHistory}
+                className="w-full bg-white/95 hover:bg-white border border-dashed border-[#D2C3B0] hover:border-[#A83232] rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2 cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#FAF5EC] border border-[#D2C3B0] group-hover:border-[#A83232] flex items-center justify-center text-[#A83232] group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
+                    <ScrollText className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-[#A83232] uppercase tracking-wider truncate">
+                        Past Notes Log
+                      </span>
+                      {unreadHistoryCount > 0 && (
+                        <span className="text-[8px] bg-[#A83232] text-[#F8E3B6] border border-[#D4AF37] px-1 py-0.2 rounded-full font-bold shadow-xs animate-pulse shrink-0">
+                          {unreadHistoryCount} NEW
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-bold text-[#36271C] truncate leading-tight">
+                      Browse timeline
+                    </p>
+                    <p className="text-[9px] text-[#9E8B75] truncate -mt-0.5">
+                      {statusHistory.length} saved notes
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <span className="px-2 py-0.5 rounded-xl bg-[#FAF5EC] group-hover:bg-[#A83232] text-[#36271C] group-hover:text-white text-[10px] font-bold border border-[#D2C3B0] group-hover:border-[#A83232] transition-colors">
+                    View
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
 

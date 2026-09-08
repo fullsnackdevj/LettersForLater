@@ -767,6 +767,7 @@ export async function deleteStoryFromCloud(pairCode, storyId) {
  * Couple Live Status & Notes Services ("What We're Currently Doing")
  */
 const LOCAL_STATUSES_KEY = 'lettersforlater_couple_statuses_v1';
+const LOCAL_STATUS_HISTORY_KEY = 'lettersforlater_couple_status_history_v1';
 
 function getLocalStatuses() {
   try {
@@ -785,15 +786,34 @@ function saveLocalStatuses(data) {
   } catch {}
 }
 
+function getLocalStatusHistory() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STATUS_HISTORY_KEY) : null;
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalStatusHistory(data) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STATUS_HISTORY_KEY, JSON.stringify(data));
+    }
+  } catch {}
+}
+
 export async function updateUserStatus(pairCode, user, statusData) {
   const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
   const userId = user?.uid || 'demo-user-1';
   const userName = user?.displayName || 'Jay';
   const userPhoto = user?.photoURL || '';
   const pht = getCurrentPHT();
+  const noteId = statusData.id || `status_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
   // A newly created/updated status note starts with 0 old cheers, 0 old reactions, and only viewed by the author
   const statusDoc = {
+    id: noteId,
     userId,
     userName,
     userPhoto,
@@ -812,20 +832,39 @@ export async function updateUserStatus(pairCode, user, statusData) {
 
   if (isFirebaseConfigured && db) {
     const statusRef = doc(db, 'pairs', cleanCode, 'statuses', userId);
-    // Overwrite without merge so old lastCheer/cheers/reactions/seenAt are cleanly cleared
+    // Overwrite active status without merge so old lastCheer/cheers/reactions/seenAt are cleanly cleared
     await setDoc(statusRef, {
       ...statusDoc,
       serverTime: serverTimestamp()
     });
+
+    // Also persist permanently into the couple status history log
+    try {
+      const historyRef = doc(db, 'pairs', cleanCode, 'statusHistory', noteId);
+      await setDoc(historyRef, {
+        ...statusDoc,
+        serverTime: serverTimestamp()
+      });
+    } catch (histErr) {
+      console.warn('Failed to append to statusHistory:', histErr);
+    }
+
     return statusDoc;
   }
 
-  // Local storage fallback
+  // Local storage fallback for active status
   const local = getLocalStatuses();
   const pairStatuses = local[cleanCode] || {};
   pairStatuses[userId] = statusDoc;
   local[cleanCode] = pairStatuses;
   saveLocalStatuses(local);
+
+  // Local storage fallback for status history
+  const localHist = getLocalStatusHistory();
+  const pairHistory = localHist[cleanCode] || [];
+  localHist[cleanCode] = [statusDoc, ...pairHistory.filter(n => n.id !== noteId).slice(0, 99)];
+  saveLocalStatusHistory(localHist);
+
   return statusDoc;
 }
 
@@ -858,6 +897,209 @@ export function subscribeToStatuses(pairCode, callback) {
   callback(initial);
 
   return () => clearInterval(pollInterval);
+}
+
+export function subscribeToStatusHistory(pairCode, callback) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    const historyCol = collection(db, 'pairs', cleanCode, 'statusHistory');
+    return onSnapshot(historyCol, (snapshot) => {
+      const historyList = [];
+      snapshot.forEach((docSnap) => {
+        historyList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      historyList.sort((a, b) => {
+        const timeA = new Date(a.updatedAtIso || a.updatedAtPHT || 0).getTime();
+        const timeB = new Date(b.updatedAtIso || b.updatedAtPHT || 0).getTime();
+        return timeB - timeA;
+      });
+      callback(historyList);
+    });
+  }
+
+  // Fallback local polling subscription
+  let lastJson = '';
+  const pollInterval = setInterval(() => {
+    const raw = localStorage.getItem(LOCAL_STATUS_HISTORY_KEY) || '{}';
+    if (raw !== lastJson) {
+      lastJson = raw;
+      const local = getLocalStatusHistory();
+      callback(local[cleanCode] || []);
+    }
+  }, 1000);
+
+  const initial = getLocalStatusHistory()[cleanCode] || [];
+  lastJson = localStorage.getItem(LOCAL_STATUS_HISTORY_KEY) || JSON.stringify(initial);
+  callback(initial);
+
+  return () => clearInterval(pollInterval);
+}
+
+export async function markStatusHistoryAsViewed(pairCode, noteId, user) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const historyRef = doc(db, 'pairs', cleanCode, 'statusHistory', noteId);
+    const snap = await getDoc(historyRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const viewedBy = Array.isArray(data.viewedBy) ? data.viewedBy : [];
+      if (!viewedBy.includes(userId)) {
+        await updateDoc(historyRef, {
+          viewedBy: [...viewedBy, userId],
+          [`seenAt_${userId}`]: timestamp,
+          lastSeenByName: userName
+        });
+      }
+    }
+    return;
+  }
+
+  // Local storage fallback
+  const local = getLocalStatusHistory();
+  const pairHistory = local[cleanCode] || [];
+  const note = pairHistory.find(n => n.id === noteId);
+  if (note) {
+    note.viewedBy = Array.isArray(note.viewedBy) ? note.viewedBy : [];
+    if (!note.viewedBy.includes(userId)) {
+      note.viewedBy.push(userId);
+      note[`seenAt_${userId}`] = timestamp;
+      note.lastSeenByName = userName;
+      saveLocalStatusHistory(local);
+    }
+  }
+}
+
+export async function reactToStatusHistory(pairCode, noteId, user, emoji) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  if (isFirebaseConfigured && db) {
+    const historyRef = doc(db, 'pairs', cleanCode, 'statusHistory', noteId);
+    const snap = await getDoc(historyRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.userId === userId) return data.reactions || {};
+      const currentReactions = data.reactions || {};
+      const emojiData = currentReactions[emoji] || { count: 0, userCounts: {}, users: [] };
+      const userCounts = { ...(emojiData.userCounts || {}) };
+      const myCount = Number(userCounts[userId]) || 0;
+      if (myCount >= 10) return currentReactions;
+
+      userCounts[userId] = myCount + 1;
+      const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+      const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+      if (!newUsers.includes(userId)) newUsers.push(userId);
+
+      const updatedReactions = {
+        ...currentReactions,
+        [emoji]: {
+          count: totalCount,
+          userCounts,
+          users: newUsers,
+          lastReactedBy: userName,
+          lastReactedAt: timestamp
+        }
+      };
+
+      await updateDoc(historyRef, { reactions: updatedReactions });
+      return updatedReactions;
+    }
+  }
+
+  // Local storage fallback
+  const local = getLocalStatusHistory();
+  const pairHistory = local[cleanCode] || [];
+  const note = pairHistory.find(n => n.id === noteId);
+  if (note) {
+    if (note.userId === userId) return note.reactions || {};
+    note.reactions = note.reactions || {};
+    const emojiData = note.reactions[emoji] || { count: 0, userCounts: {}, users: [] };
+    const userCounts = { ...(emojiData.userCounts || {}) };
+    const myCount = Number(userCounts[userId]) || 0;
+    if (myCount >= 10) return note.reactions;
+
+    userCounts[userId] = myCount + 1;
+    const totalCount = Object.values(userCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+    const newUsers = Array.isArray(emojiData.users) ? [...emojiData.users] : [];
+    if (!newUsers.includes(userId)) newUsers.push(userId);
+
+    note.reactions[emoji] = {
+      count: totalCount,
+      userCounts,
+      users: newUsers,
+      lastReactedBy: userName,
+      lastReactedAt: timestamp
+    };
+    saveLocalStatusHistory(local);
+    return note.reactions;
+  }
+  return null;
+}
+
+export async function sendCheerToStatusHistory(pairCode, noteId, user, cheerText) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const userId = user?.uid || 'demo-user-1';
+  const userName = user?.displayName || 'Partner';
+  const timestamp = new Date().toISOString();
+
+  const cheerObj = {
+    text: cheerText,
+    fromName: userName,
+    fromId: userId,
+    atIso: timestamp
+  };
+
+  if (isFirebaseConfigured && db) {
+    const historyRef = doc(db, 'pairs', cleanCode, 'statusHistory', noteId);
+    const snap = await getDoc(historyRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentCheers = Array.isArray(data.cheers) ? data.cheers : [];
+      const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
+      await updateDoc(historyRef, {
+        lastCheer: cheerObj,
+        cheers: updatedCheers,
+        viewedBy: [userId]
+      });
+      return { lastCheer: cheerObj, cheers: updatedCheers };
+    }
+  }
+
+  // Local storage fallback
+  const local = getLocalStatusHistory();
+  const pairHistory = local[cleanCode] || [];
+  const note = pairHistory.find(n => n.id === noteId);
+  if (note) {
+    const currentCheers = Array.isArray(note.cheers) ? note.cheers : [];
+    const updatedCheers = [cheerObj, ...currentCheers.slice(0, 19)];
+    note.lastCheer = cheerObj;
+    note.cheers = updatedCheers;
+    saveLocalStatusHistory(local);
+    return { lastCheer: cheerObj, cheers: updatedCheers };
+  }
+  return null;
+}
+
+export async function deleteStatusHistoryNote(pairCode, noteId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  if (isFirebaseConfigured && db) {
+    try {
+      await deleteDoc(doc(db, 'pairs', cleanCode, 'statusHistory', noteId));
+    } catch (err) {
+      console.warn('Failed to delete history note from Firestore:', err);
+    }
+  }
+
+  const local = getLocalStatusHistory();
+  const pairHistory = local[cleanCode] || [];
+  local[cleanCode] = pairHistory.filter(n => n.id !== noteId);
+  saveLocalStatusHistory(local);
 }
 
 export async function reactToStatus(pairCode, targetUserId, user, emoji) {

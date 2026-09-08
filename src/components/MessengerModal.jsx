@@ -160,7 +160,8 @@ export default function MessengerModal({
   onSaveToVault,
   onOpenCallPrompt
 }) {
-  const [inputText, setInputText] = useState('');
+  const [hasInputText, setHasInputText] = useState(false);
+  const inputTextRef = useRef('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [attachedImage, setAttachedImage] = useState(null);
   
@@ -235,9 +236,14 @@ export default function MessengerModal({
   }, []);
 
   // Adjust Textarea Height dynamically up to 5 lines (Messenger style)
+  // Uses ref-based value tracking to avoid re-rendering the entire message list on every keystroke
   const handleTextareaInput = useCallback((e) => {
     const text = e.target.value;
-    setInputText(text);
+    inputTextRef.current = text;
+
+    // Only update React state for the send button enabled/disabled toggle
+    const hasTxt = text.trim().length > 0;
+    setHasInputText(prev => prev !== hasTxt ? hasTxt : prev);
 
     const target = textareaRef.current;
     if (target) {
@@ -353,7 +359,7 @@ export default function MessengerModal({
 
   // Send message
   const handleSend = async (customPayload = null) => {
-    const textToSend = customPayload?.text !== undefined ? customPayload.text : inputText.trim();
+    const textToSend = customPayload?.text !== undefined ? customPayload.text : inputTextRef.current.trim();
     const mediaToSend = customPayload?.mediaDataUrl || attachedImage?.dataUrl || customPayload?.mediaUrl;
     const hasAudio = customPayload?.audioBlob || customPayload?.audioDataUrl;
 
@@ -374,12 +380,14 @@ export default function MessengerModal({
         } : null
       };
 
-      setInputText('');
+      inputTextRef.current = '';
+      setHasInputText(false);
       setAttachedImage(null);
       setReplyingTo(null);
       setShowEmojiPicker(false);
 
       if (textareaRef.current) {
+        textareaRef.current.value = '';
         textareaRef.current.style.height = 'auto';
       }
 
@@ -409,12 +417,14 @@ export default function MessengerModal({
   const handleStartEdit = (msg) => {
     if (!msg || !msg.text) return;
     setEditingMessage(msg);
-    setInputText(msg.text);
+    inputTextRef.current = msg.text;
+    setHasInputText(true);
     setReplyingTo(null);
     setAttachedImage(null);
     setActiveActionSheetMessage(null);
     setTimeout(() => {
       if (textareaRef.current) {
+        textareaRef.current.value = msg.text;
         textareaRef.current.focus();
         textareaRef.current.style.height = 'auto';
         textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
@@ -424,16 +434,18 @@ export default function MessengerModal({
 
   // Save edited message
   const handleSaveEdit = async () => {
-    if (!editingMessage || !inputText.trim()) return;
+    if (!editingMessage || !inputTextRef.current.trim()) return;
     setIsSending(true);
     try {
       if (onUpdateMessage) {
-        await onUpdateMessage(editingMessage.id, inputText.trim());
+        await onUpdateMessage(editingMessage.id, inputTextRef.current.trim());
       }
       showToast('Message updated ✏️');
       setEditingMessage(null);
-      setInputText('');
+      inputTextRef.current = '';
+      setHasInputText(false);
       if (textareaRef.current) {
+        textareaRef.current.value = '';
         textareaRef.current.style.height = 'auto';
       }
     } catch (err) {
@@ -447,8 +459,10 @@ export default function MessengerModal({
   // Cancel edit
   const handleCancelEdit = () => {
     setEditingMessage(null);
-    setInputText('');
+    inputTextRef.current = '';
+    setHasInputText(false);
     if (textareaRef.current) {
+      textareaRef.current.value = '';
       textareaRef.current.style.height = 'auto';
     }
   };
@@ -1066,8 +1080,12 @@ export default function MessengerModal({
                   key={i}
                   type="button"
                   onClick={() => {
-                    setInputText(prev => prev + emoji);
-                    textareaRef.current?.focus();
+                    inputTextRef.current = inputTextRef.current + emoji;
+                    setHasInputText(true);
+                    if (textareaRef.current) {
+                      textareaRef.current.value = inputTextRef.current;
+                      textareaRef.current.focus();
+                    }
                   }}
                   className="p-1 hover:bg-white rounded-xl hover:scale-125 transition-transform flex items-center justify-center cursor-pointer"
                 >
@@ -1175,7 +1193,7 @@ export default function MessengerModal({
                 <textarea
                   ref={textareaRef}
                   rows={1}
-                  value={inputText}
+                  defaultValue=""
                   onChange={handleTextareaInput}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1195,9 +1213,9 @@ export default function MessengerModal({
               {/* Send / Save Button */}
               <button
                 type="submit"
-                disabled={(!inputText.trim() && !attachedImage) || isSending}
+                disabled={(!hasInputText && !attachedImage) || isSending}
                 className={`p-2.5 rounded-2xl font-bold flex items-center justify-center transition-all cursor-pointer shrink-0 pb-2 ${
-                  (inputText.trim() || attachedImage) && !isSending
+                  (hasInputText || attachedImage) && !isSending
                     ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
                     : 'bg-[#EFE9DE] text-[#9E8B75] opacity-50 cursor-not-allowed'
                 }`}

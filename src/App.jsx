@@ -25,6 +25,7 @@ import CallModal from './components/CallModal';
 import MessengerModal from './components/MessengerModal';
 import RandomQuestionModal from './components/RandomQuestionModal';
 import KnowMeFacilityModal from './components/KnowMeFacilityModal';
+import StatusHistoryModal from './components/StatusHistoryModal';
 
 import { 
   listenForIncomingCalls, 
@@ -54,6 +55,11 @@ import {
   deleteStoryFromCloud,
   updateUserStatus,
   subscribeToStatuses,
+  subscribeToStatusHistory,
+  markStatusHistoryAsViewed,
+  reactToStatusHistory,
+  sendCheerToStatusHistory,
+  deleteStatusHistoryNote,
   reactToStatus,
   sendCheerToStatus,
   markStatusAsViewed,
@@ -129,8 +135,10 @@ export default function App() {
 
   // Live Status Notes ("What We're Currently Doing")
   const [statuses, setStatuses] = useState({});
+  const [statusHistory, setStatusHistory] = useState([]);
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
   const [isStatusDetailOpen, setIsStatusDetailOpen] = useState(false);
+  const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
   const [selectedStatusForDetail, setSelectedStatusForDetail] = useState(null);
 
   // Fantasy / Bucket List Modal
@@ -235,6 +243,15 @@ export default function App() {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const unsubscribe = subscribeToStatuses(pairCode, (fetchedStatuses) => {
       setStatuses(fetchedStatuses || {});
+    });
+    return () => unsubscribe();
+  }, [pairInfo?.code]);
+
+  // Subscribe to Realtime Status History ("Past Notes History")
+  useEffect(() => {
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const unsubscribe = subscribeToStatusHistory(pairCode, (fetchedHistory) => {
+      setStatusHistory(fetchedHistory || []);
     });
     return () => unsubscribe();
   }, [pairInfo?.code]);
@@ -846,6 +863,35 @@ export default function App() {
     await markStatusAsViewed(pairCode, targetUserId, user);
   }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
 
+  // Status History Handlers
+  const handleMarkHistoryNoteViewed = useCallback(async (noteId) => {
+    if (!noteId || !user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await markStatusHistoryAsViewed(pairCode, noteId, user);
+  }, [pairInfo?.code, user]);
+
+  const handleReactToHistoryNote = useCallback(async (noteId, emoji) => {
+    if (!noteId || !user || !emoji) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await reactToStatusHistory(pairCode, noteId, user, emoji);
+  }, [pairInfo?.code, user]);
+
+  const handleSendCheerToHistoryNote = useCallback(async (noteId, cheerText) => {
+    if (!noteId || !user || !cheerText) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await sendCheerToStatusHistory(pairCode, noteId, user, cheerText);
+  }, [pairInfo?.code, user]);
+
+  const handleDeleteHistoryNote = useCallback(async (noteId) => {
+    if (!noteId) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    await deleteStatusHistoryNote(pairCode, noteId);
+  }, [pairInfo?.code]);
+
+  const handleOpenStatusHistory = useCallback(() => {
+    setIsStatusHistoryOpen(true);
+  }, []);
+
   // Sync viewerStories with latest live story metadata (reactions, views) without resetting viewer slide
   useEffect(() => {
     if (isStoryViewerOpen && viewerStories.length > 0) {
@@ -1100,6 +1146,7 @@ export default function App() {
           user={user}
           pairInfo={pairInfo}
           statuses={statuses}
+          statusHistory={statusHistory}
           partnerPresence={partnerPresence}
           onOpenStatusPicker={() => setIsStatusPickerOpen(true)}
           onOpenStatusDetail={(statusDoc) => {
@@ -1107,6 +1154,7 @@ export default function App() {
             setIsStatusDetailOpen(true);
           }}
           onOpenCallPrompt={() => setIsCallPromptOpen(true)}
+          onOpenStatusHistory={handleOpenStatusHistory}
         />
       )}
 
@@ -1327,6 +1375,23 @@ export default function App() {
           setIsStatusPickerOpen(true);
         }}
         onOpenCallPrompt={() => setIsCallPromptOpen(true)}
+        onOpenStatusHistory={() => {
+          setIsStatusDetailOpen(false);
+          handleOpenStatusHistory();
+        }}
+      />
+
+      {/* Past Notes History Modal */}
+      <StatusHistoryModal
+        isOpen={isStatusHistoryOpen}
+        onClose={() => setIsStatusHistoryOpen(false)}
+        statusHistory={statusHistory}
+        currentUser={user}
+        pairInfo={pairInfo}
+        onReactToNote={handleReactToHistoryNote}
+        onSendCheerToNote={handleSendCheerToHistoryNote}
+        onMarkNoteViewed={handleMarkHistoryNoteViewed}
+        onDeleteNote={handleDeleteHistoryNote}
       />
 
       {/* Our Fantasy / Bucket List Note Modal */}

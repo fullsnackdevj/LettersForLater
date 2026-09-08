@@ -8,7 +8,8 @@ import {
   Sparkles, 
   Send,
   MessageCircleHeart,
-  Video
+  Video,
+  ScrollText
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
 import { getCheersForStatus } from '../data/statusPresets';
@@ -25,7 +26,8 @@ export default function StatusDetailModal({
   onSendCheer,
   onMarkStatusAsViewed,
   onOpenStatusPicker,
-  onOpenCallPrompt
+  onOpenCallPrompt,
+  onOpenStatusHistory
 }) {
   const [floatingParticles, setFloatingParticles] = useState([]);
   const [sentCheer, setSentCheer] = useState(null);
@@ -171,6 +173,21 @@ export default function StatusDetailModal({
           </span>
 
           <div className="flex items-center gap-1.5">
+            {onOpenStatusHistory && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenStatusHistory();
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#36271C] text-[10px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="View Past Notes History"
+              >
+                <ScrollText className="w-2.5 h-2.5 text-[#A83232]" />
+                <span>History</span>
+              </button>
+            )}
+
             {isMine && onOpenStatusPicker && (
               <button
                 type="button"
@@ -494,6 +511,20 @@ export default function StatusDetailModal({
               >
                 <Edit3 className="w-3.5 h-3.5 text-[#A83232]" />
                 <span>Change / Update My Status</span>
+              </button>
+            )}
+
+            {onOpenStatusHistory && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenStatusHistory();
+                }}
+                className="w-full py-2 rounded-2xl bg-white hover:bg-[#FAF5EC] text-[#7A6855] hover:text-[#36271C] text-xs font-semibold transition-all border border-dashed border-[#D2C3B0] hover:border-[#A83232] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <ScrollText className="w-3.5 h-3.5 text-[#A83232]" />
+                <span>Browse All Past Notes & Memories</span>
               </button>
             )}
 
