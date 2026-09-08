@@ -713,7 +713,7 @@ export default function StoryViewerModal({
                 alt="Story"
                 loading="eager"
                 decoding="async"
-                className="w-full h-full object-contain sm:object-cover pointer-events-none select-none transition-transform duration-200"
+                className="w-full h-full object-contain pointer-events-none select-none transition-transform duration-200"
               />
               
               {/* Optional Polaroid tape effect on top */}
