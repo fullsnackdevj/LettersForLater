@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Clock, 
-  Eye, 
-  Edit3, 
-  Check, 
-  Sparkles, 
   Send,
-  MessageCircleHeart,
   Video,
-  ScrollText
+  FileText,
+  Smile,
+  Plus,
+  Check
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
-import { getCheersForStatus } from '../data/statusPresets';
 
-const STATUS_REACTION_EMOJIS = ['❤️', '💪', '☕', '🥰', '🫶', '✨'];
+const STATUS_REACTION_EMOJIS = ['❤️', '😂', '😢', '🙏', '😊'];
 
 export default function StatusDetailModal({
   isOpen,
@@ -24,14 +20,17 @@ export default function StatusDetailModal({
   pairInfo,
   onReactToStatus,
   onSendCheer,
+  onSendChatMessage,
+  onOpenChat,
   onMarkStatusAsViewed,
   onOpenStatusPicker,
   onOpenCallPrompt,
   onOpenStatusHistory
 }) {
+  const [showReactions, setShowReactions] = useState(false);
   const [floatingParticles, setFloatingParticles] = useState([]);
-  const [sentCheer, setSentCheer] = useState(null);
-  const [customCheerText, setCustomCheerText] = useState('');
+  const [replyText, setReplyText] = useState('');
+  const [sentFeedback, setSentFeedback] = useState(null);
 
   const currentUserId = currentUser?.uid || 'demo-user-1';
   const targetUserId = targetStatus?.userId;
@@ -50,8 +49,9 @@ export default function StatusDetailModal({
   // Reset state when closed
   useEffect(() => {
     if (!isOpen) {
-      setSentCheer(null);
-      setCustomCheerText('');
+      setShowReactions(false);
+      setReplyText('');
+      setSentFeedback(null);
     }
   }, [isOpen]);
 
@@ -61,6 +61,7 @@ export default function StatusDetailModal({
   const user2Name = getNickname(pairInfo?.user2?.name) || 'Partner';
   const partnerName = currentUserName === user2Name ? 'Jay' : user2Name;
   const targetName = isMine ? currentUserName : (getNickname(targetStatus.userName) || partnerName);
+  const authorPhoto = targetStatus.userPhoto || (isMine ? currentUser?.photoURL : pairInfo?.user2?.photo) || '';
 
   // Relative Time helper
   const getTimeAgo = (isoString) => {
@@ -79,33 +80,9 @@ export default function StatusDetailModal({
   const viewedList = Array.isArray(targetStatus.viewedBy) ? targetStatus.viewedBy : [];
   const isSeenByOther = viewedList.some(id => id !== targetUserId);
 
-  // Get matching contextual cheers for the active status
-  const contextualCheers = getCheersForStatus(targetStatus?.statusId, targetStatus?.statusText);
-
-  // Total reactions calculation
-  const totalPartnerReactions = Object.values(targetStatus.reactions || {}).reduce(
-    (sum, r) => sum + (Number(r?.count) || 0),
-    0
-  );
-
-  // All cheers / replies on this note
-  const allCheers = Array.isArray(targetStatus.cheers) && targetStatus.cheers.length > 0
-    ? targetStatus.cheers
-    : (targetStatus.lastCheer ? [targetStatus.lastCheer] : []);
-
   // Handle reaction tap
   const handleReactionTap = (emoji) => {
-    // Note creator should not be able to react to their own note
     if (isMine || !targetUserId || !onReactToStatus) return;
-
-    const emojiData = targetStatus.reactions?.[emoji];
-    const userCounts = emojiData?.userCounts || {};
-    let myCount = Number(userCounts[currentUserId]);
-    if (myCount === undefined || isNaN(myCount)) {
-      myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-    }
-
-    if (myCount >= 10) return;
 
     // Haptic feedback
     if (typeof window !== 'undefined' && window.navigator?.vibrate) {
@@ -116,10 +93,10 @@ export default function StatusDetailModal({
     const newParticles = Array.from({ length: 6 }).map((_, idx) => ({
       id: Date.now() + idx + Math.random(),
       emoji,
-      left: 20 + Math.random() * 60,
-      scale: 0.85 + Math.random() * 0.45,
-      rotation: Math.random() * 40 - 20,
-      delay: idx * 0.04
+      left: 30 + Math.random() * 40,
+      scale: 0.9 + Math.random() * 0.4,
+      rotation: Math.random() * 30 - 15,
+      delay: idx * 0.05
     }));
 
     setFloatingParticles(prev => [...prev, ...newParticles]);
@@ -128,28 +105,55 @@ export default function StatusDetailModal({
     }, 1200);
 
     onReactToStatus(targetUserId, emoji);
+    setShowReactions(false);
   };
 
-  const handleSendCheer = (cheerText) => {
-    if (!targetUserId) return;
+  // Handle sending a reply (Dispatches to chat and Firestore)
+  const handleSendReply = async (e) => {
+    e?.preventDefault();
+    if (!targetUserId || !replyText.trim()) return;
+    const text = replyText.trim();
+
     if (onSendCheer) {
-      onSendCheer(targetUserId, cheerText);
-    } else {
-      handleReactionTap('💬');
+      onSendCheer(targetUserId, text);
     }
-    setSentCheer(cheerText);
-    setTimeout(() => setSentCheer(null), 3000);
+
+    if (onSendChatMessage) {
+      const noteSnippet = targetStatus.customNote 
+        ? `"${targetStatus.customNote}"` 
+        : `${targetStatus.statusText}`;
+
+      try {
+        await onSendChatMessage({
+          text,
+          replyTo: {
+            id: `note_${targetUserId}`,
+            senderName: targetName,
+            text: noteSnippet,
+            isNoteReply: true
+          }
+        });
+      } catch (err) {
+        console.error('Failed to forward note reply to chat widget:', err);
+      }
+    }
+
+    setSentFeedback(text);
+    setReplyText('');
+    setTimeout(() => setSentFeedback(null), 3500);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
-      
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+      onClick={onClose}
+    >
       {/* Floating Reaction Burst Overlay */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
         {floatingParticles.map(p => (
           <span
             key={p.id}
-            className="absolute bottom-24 text-3xl animate-floatUp opacity-0"
+            className="absolute bottom-32 text-3xl animate-floatUp opacity-0"
             style={{
               left: `${p.left}%`,
               transform: `rotate(${p.rotation}deg) scale(${p.scale})`,
@@ -161,376 +165,215 @@ export default function StatusDetailModal({
         ))}
       </div>
 
+      {/* Main Modal Card (Clean Instagram/Messenger Note Style) */}
       <div 
-        className="relative w-full max-w-sm bg-[#FDFBF7] border-2 border-[#E2D7C7] rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh]"
+        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto border border-stone-100 animate-scaleIn"
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2D7C7] bg-[#F4EFE6]/70 shrink-0">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[#9E8B75]">
-            {isMine ? 'Your Note' : `${targetName}'s Note`}
-          </span>
+        {/* ── TOP HEADER ────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#EAF3EC] border border-[#D5E7DA] flex items-center justify-center text-[#2D6A4F] shadow-2xs">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#2D6A4F]" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-stone-900 leading-tight">
+                {targetName}
+              </h3>
+              <p className="text-[11px] text-stone-500 font-medium">
+                Note
+              </p>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-1.5">
-            {onOpenStatusHistory && (
+          <div className="flex items-center gap-1">
+            {!isMine && onOpenCallPrompt && (
               <button
                 type="button"
                 onClick={() => {
                   onClose();
-                  onOpenStatusHistory();
+                  onOpenCallPrompt();
                 }}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#36271C] text-[10px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                title="View Past Notes History"
+                className="p-2 rounded-full text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer"
+                title={`Call ${targetName}`}
               >
-                <ScrollText className="w-2.5 h-2.5 text-[#A83232]" />
-                <span>History</span>
-              </button>
-            )}
-
-            {isMine && onOpenStatusPicker && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenStatusPicker();
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#A83232] text-[10px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                title="Change status"
-              >
-                <Edit3 className="w-2.5 h-2.5 text-[#A83232]" />
-                <span>Edit</span>
+                <Video className="w-5 h-5" />
               </button>
             )}
 
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-[#EFE9DE] hover:bg-[#E2D7C7] text-[#4A3B2C] flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
+              className="p-2 rounded-full text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer"
               title="Close"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Container */}
-        <div className="overflow-y-auto custom-scrollbar flex-1 p-4 sm:p-5 space-y-3.5">
-          
-          {/* Main Hero: Thought/Note Bubble & Identity */}
-          <div className="space-y-3 pt-1">
+        {/* ── NOTE BODY SECTION (Compact with No Artificial Empty Space) ── */}
+        <div className="px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-start gap-3 sm:gap-3.5">
             
-            {/* Note Speech Bubble */}
-            <div className="relative bg-white border border-[#D2C3B0] rounded-3xl p-4 shadow-sm text-center space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A83232] bg-[#FAF5EC] px-3 py-1 rounded-full border border-[#D4AF37]/40 shadow-2xs">
-                <span className="text-sm">{targetStatus.emoji || '💭'}</span>
-                <span>{targetStatus.statusText}</span>
-              </div>
-              
-              {targetStatus.customNote && (
-                <p className="font-serif-vintage text-[15px] sm:text-base text-[#36271C] leading-snug italic pt-1 px-2">
-                  "{targetStatus.customNote}"
-                </p>
-              )}
-
-              {/* Triangle Tail pointing to avatar below */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-[#D2C3B0] rotate-45" />
-            </div>
-
-            {/* Author Identity & Metadata */}
-            <div className="flex items-center justify-center gap-3 pt-1">
+            {/* Avatar */}
+            <div className="relative shrink-0">
               <img
-                src={targetStatus.userPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                src={authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'}
                 alt={targetName}
-                className="w-12 h-12 rounded-full object-cover border-2 border-[#D4AF37] shadow-sm"
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-stone-200 shadow-2xs"
               />
-              <div className="text-left">
-                <h4 className="font-serif-vintage font-bold text-base text-[#36271C] capitalize leading-tight">
-                  {targetName}
-                </h4>
-                <div className="flex items-center gap-1.5 text-[11px] text-[#9E8B75] mt-0.5">
-                  <Clock className="w-3 h-3 text-[#A83232]" />
-                  <span>{getTimeAgo(targetStatus.updatedAtIso)}</span>
-                  <span>•</span>
-                  <span className="text-emerald-700 font-semibold inline-flex items-center gap-0.5">
-                    <Eye className="w-2.5 h-2.5" />
-                    <span>
-                      {isSeenByOther
-                        ? isMine ? `Seen by ${partnerName} 💕` : `Seen by you 👀`
-                        : isMine ? `Unseen` : `Seen`}
-                    </span>
-                  </span>
+            </div>
+
+            {/* Content Column */}
+            <div className="flex-1 min-w-0">
+              {/* Note Bubble with Edge Reaction Trigger & Left-Anchored Popup Bar */}
+              <div className="relative mb-2.5">
+                <div className="bg-[#EAF3EC] text-[#1E3A2B] rounded-2xl rounded-tl-sm px-4 py-3 border border-[#D5E7DA] shadow-2xs">
+                  <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words font-normal">
+                    {targetStatus.customNote || targetStatus.statusText || 'No note added'}
+                  </p>
                 </div>
-              </div>
-            </div>
 
-          </div>
-
-          {/* ─────────────────────────────────────────────────────────────
-              REPLIES & CHEERS STREAM (Visible to both author & partner)
-             ───────────────────────────────────────────────────────────── */}
-          <div className="pt-2.5 border-t border-[#E2D7C7] space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
-              <span className="flex items-center gap-1.5">
-                <MessageCircleHeart className="w-3.5 h-3.5 text-[#A83232]" />
-                <span>Sweet Replies & Cheers</span>
-              </span>
-              {allCheers.length > 0 && (
-                <span className="text-[10px] bg-[#FAF5EC] text-[#A83232] border border-[#D4AF37]/50 px-2 py-0.2 rounded-full font-bold shadow-2xs">
-                  {allCheers.length} {allCheers.length === 1 ? 'reply' : 'replies'}
-                </span>
-              )}
-            </div>
-
-            {allCheers.length > 0 ? (
-              <div className="space-y-2 max-h-44 overflow-y-auto custom-scrollbar pr-0.5">
-                {allCheers.map((cheer, idx) => {
-                  const isFromMe = cheer.fromId === currentUserId;
-                  const senderName = isFromMe ? 'You' : (getNickname(cheer.fromName) || partnerName);
-                  return (
-                    <div 
-                      key={cheer.atIso || idx}
-                      className={`p-2.5 rounded-2xl text-xs transition-all ${
-                        isFromMe 
-                          ? 'bg-[#FFF9EE] border border-[#D4AF37]/50 shadow-2xs ml-3' 
-                          : 'bg-white border border-[#E2D7C7] shadow-2xs mr-3'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                          isFromMe ? 'text-[#A83232]' : 'text-[#7A6855]'
-                        }`}>
-                          <span>💬</span>
-                          <span>{senderName}</span>
-                        </span>
-                        {cheer.atIso && (
-                          <span className="text-[9px] text-[#9E8B75]">
-                            {getTimeAgo(cheer.atIso)}
-                          </span>
-                        )}
+                {/* Reaction Cluster: Popup emojis on the LEFT of the icon */}
+                {!isMine && (
+                  <div className="absolute -bottom-3.5 right-0 flex items-center gap-1.5 z-20">
+                    {/* Pop-up emojis on the LEFT of the icon */}
+                    {showReactions && (
+                      <div className="inline-flex items-center gap-2 sm:gap-2.5 bg-white border border-stone-200/90 rounded-full px-2.5 sm:px-3 py-1 shadow-lg animate-fadeIn origin-right">
+                        {STATUS_REACTION_EMOJIS.map((emoji) => {
+                          const emojiData = targetStatus.reactions?.[emoji];
+                          const count = emojiData?.count || 0;
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReactionTap(emoji)}
+                              className="relative text-lg sm:text-xl hover:scale-125 active:scale-95 transition-transform cursor-pointer select-none leading-none"
+                              title={`React ${emoji}`}
+                            >
+                              {emoji}
+                              {count > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold bg-[#2D6A4F] text-white rounded-full px-1 min-w-[12px] text-center border border-white">
+                                  {count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <p className="text-[#36271C] font-medium leading-relaxed break-words text-xs">
-                        "{cheer.text}"
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="bg-[#FAF5EC]/70 border border-dashed border-[#D2C3B0] rounded-2xl p-2.5 text-center space-y-0.5">
-                <p className="text-[11px] font-semibold text-[#7A6855]">
-                  No replies to this note yet
-                </p>
-                <p className="text-[10px] text-[#9E8B75]">
-                  {!isMine 
-                    ? `Send ${targetName} a sweet reply or cheer below 💕` 
-                    : `Write a reply or wait for ${partnerName} 💕`}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* ─────────────────────────────────────────────────────────────
-              INTERACTIONS & REPLIES SECTION
-             ───────────────────────────────────────────────────────────── */}
-          <div className="pt-2 border-t border-[#E2D7C7] space-y-2.5">
-            
-            {/* Quick Cheer Suggestion Pills (For Partner) */}
-            {!isMine && contextualCheers && contextualCheers.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#9E8B75]">
-                  <span className="flex items-center gap-1">
-                    <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
-                    <span>Quick Cheers</span>
-                  </span>
-                </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-                  {contextualCheers.slice(0, 6).map((presetCheer, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleSendCheer(presetCheer)}
-                      className="shrink-0 bg-white hover:bg-[#FAF5EC] active:scale-95 border border-[#E2D7C7] hover:border-[#D4AF37] text-[#36271C] text-[11px] font-medium px-2.5 py-1 rounded-full shadow-2xs transition-all cursor-pointer whitespace-nowrap"
-                      title={`Send "${presetCheer}"`}
-                    >
-                      {presetCheer}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Reactions Header & Buttons (For Partner) */}
-            {!isMine && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-bold text-[#7A6855]">
-                  <span>Tap to React 💕</span>
-                  <div className="flex items-center gap-2">
-                    {onOpenCallPrompt && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onOpenCallPrompt();
-                        }}
-                        className="inline-flex items-center gap-1 text-[10px] text-[#A83232] bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D4AF37]/50 px-2 py-0.5 rounded-full font-bold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95"
-                        title={`Call ${partnerName}`}
-                      >
-                        <Video className="w-2.5 h-2.5 text-[#A83232]" />
-                        <span>Call</span>
-                      </button>
                     )}
-                    <span className="text-[10px] text-[#9E8B75] font-normal">Tap up to 10x</span>
+
+                    {/* Reaction Emoji Icon Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowReactions(prev => !prev);
+                      }}
+                      className={`w-7 h-7 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 shrink-0 ${
+                        showReactions 
+                          ? 'ring-2 ring-[#2D6A4F]/50 text-[#2D6A4F]' 
+                          : 'text-stone-500 hover:text-[#2D6A4F]'
+                      }`}
+                      title="React with emojis"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-6 gap-1.5 items-center justify-items-center">
-                  {STATUS_REACTION_EMOJIS.map((emoji) => {
-                    const emojiData = targetStatus.reactions?.[emoji];
-                    const totalCount = emojiData?.count || 0;
-                    const userCounts = emojiData?.userCounts || {};
-                    let myCount = Number(userCounts[currentUserId]);
-                    if (myCount === undefined || isNaN(myCount)) {
-                      myCount = emojiData?.users?.includes(currentUserId) && emojiData?.count ? emojiData.count : 0;
-                    }
-                    const isMaxed = myCount >= 10;
-                    const hasReacted = myCount > 0;
-
-                    return (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => handleReactionTap(emoji)}
-                        disabled={isMaxed}
-                        className={`relative group w-full aspect-square rounded-xl flex items-center justify-center transition-all touch-manipulation cursor-pointer ${
-                          isMaxed
-                            ? 'bg-gray-100 border border-gray-300 opacity-60 cursor-not-allowed'
-                            : hasReacted
-                              ? 'bg-[#FAF5EC] border-2 border-[#D4AF37] shadow-xs hover:scale-110 active:scale-125'
-                              : 'bg-white border border-[#E2D7C7] hover:border-[#D4AF37] active:scale-125 hover:bg-[#FAF5EC]'
-                        }`}
-                        title={`Send ${emoji} (${myCount}/10)`}
-                      >
-                        <span className="text-xl group-hover:scale-110 transition-transform select-none">
-                          {emoji}
-                        </span>
-
-                        {totalCount > 0 && (
-                          <span className={`absolute -top-1.5 -right-1 px-1.5 py-0.2 min-w-[15px] text-[9px] font-mono font-bold rounded-full shadow-xs border text-center ${
-                            isMaxed
-                              ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]'
-                              : hasReacted
-                                ? 'bg-[#D4AF37] text-[#36271C] border-white'
-                                : 'bg-[#36271C] text-white border-white'
-                          }`}>
-                            {totalCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
-            )}
 
-            {/* Partner Reactions Summary (For Author) */}
-            {isMine && totalPartnerReactions > 0 && (
-              <div className="p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#D4AF37]/40 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#9E8B75] flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
-                  <span>Reactions from {partnerName}</span>
+              {/* Metadata: Relative Time & Seen */}
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 mt-2.5 ml-1">
+                <span>{getTimeAgo(targetStatus.updatedAtIso)}</span>
+                <span>•</span>
+                <span className="text-emerald-700 font-medium">
+                  {isSeenByOther
+                    ? (isMine ? `Seen by ${partnerName}` : `Seen by you`)
+                    : (isMine ? `Delivered` : `New`)}
                 </span>
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {Object.entries(targetStatus.reactions || {}).map(([emoji, data]) => {
-                    const count = Number(data?.count) || 0;
-                    if (count <= 0) return null;
-                    return (
-                      <span 
-                        key={emoji}
-                        className="inline-flex items-center gap-1 bg-white border border-[#E2D7C7] px-2 py-0.5 rounded-full text-xs font-bold text-[#36271C] shadow-2xs"
-                      >
-                        <span>{emoji}</span>
-                        <span className="text-[10px] text-[#A83232] font-mono font-bold">x{count}</span>
-                      </span>
-                    );
-                  })}
-                </div>
               </div>
-            )}
 
-            {/* Universal Reply Input Form (For Both Note Author & Partner) */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!customCheerText.trim()) return;
-                handleSendCheer(customCheerText.trim());
-                setCustomCheerText('');
-              }}
-              className="flex items-center gap-1.5 bg-white border border-[#D2C3B0] focus-within:border-[#A83232] focus-within:ring-1 focus-within:ring-[#A83232] rounded-2xl p-1 shadow-2xs transition-all"
-            >
-              <input
-                type="text"
-                value={customCheerText}
-                onChange={(e) => setCustomCheerText(e.target.value)}
-                maxLength={100}
-                placeholder={isMine ? `Reply to ${partnerName}...` : `Write a sweet reply to ${targetName}...`}
-                className="flex-1 min-w-0 bg-transparent px-3 py-1.5 text-xs text-[#36271C] placeholder-[#9E8B75] focus:outline-none font-medium"
-              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── BOTTOM DIRECT REPLY COMPOSER (Snug, No Big Space) ── */}
+        {!isMine ? (
+          <div className="px-4 py-3 border-t border-stone-100 bg-white">
+            <form onSubmit={handleSendReply} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReactions(prev => !prev)}
+                className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-2xs"
+                title="Reaction options"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+
+              <div className="flex-1 flex items-center bg-[#F1F5F9] rounded-full px-3.5 py-2 transition-all focus-within:ring-2 focus-within:ring-[#2D6A4F]/30 focus-within:bg-white focus-within:border focus-within:border-[#2D6A4F]">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  maxLength={120}
+                  placeholder={`Reply to ${targetName.toLowerCase()}...`}
+                  className="w-full bg-transparent text-xs text-stone-800 placeholder-stone-400 focus:outline-none"
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={!customCheerText.trim()}
-                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                  customCheerText.trim()
-                    ? 'bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] shadow-xs active:scale-95'
-                    : 'bg-[#EFE9DE] text-[#9E8B75] opacity-60 cursor-not-allowed'
+                disabled={!replyText.trim()}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-2xs ${
+                  replyText.trim()
+                    ? 'bg-[#2D6A4F] hover:bg-[#1E4D38] text-white active:scale-95'
+                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
                 }`}
                 title="Send reply"
               >
-                <span>Send</span>
-                <Send className="w-3 h-3" />
+                <Send className="w-3.5 h-3.5" />
               </button>
             </form>
 
-            {/* Sent Reply Toast / Confirmation */}
-            {sentCheer && (
-              <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 animate-fadeIn shadow-2xs">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">Sent reply: "{sentCheer}"</span>
+            {/* Sent confirmation */}
+            {sentFeedback && (
+              <div className="mt-2 py-1.5 px-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium flex items-center justify-between animate-fadeIn">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate">Sent to chat: "{sentFeedback}"</span>
+                </div>
+                {onOpenChat && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenChat();
+                    }}
+                    className="text-[10px] font-bold text-emerald-700 underline hover:text-emerald-900 shrink-0 ml-1"
+                  >
+                    Open Chat
+                  </button>
+                )}
               </div>
             )}
-
-            {/* Bottom Change My Status Button (For Note Author) */}
-            {isMine && onOpenStatusPicker && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenStatusPicker();
-                }}
-                className="w-full py-2 rounded-2xl bg-[#FAF5EC] hover:bg-[#EAE2D3] text-[#36271C] text-xs font-bold shadow-xs transition-all hover:scale-101 active:scale-98 flex items-center justify-center gap-1.5 border border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-[#A83232]" />
-                <span>Change / Update My Status</span>
-              </button>
-            )}
-
-            {onOpenStatusHistory && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenStatusHistory();
-                }}
-                className="w-full py-2 rounded-2xl bg-white hover:bg-[#FAF5EC] text-[#7A6855] hover:text-[#36271C] text-xs font-semibold transition-all border border-dashed border-[#D2C3B0] hover:border-[#A83232] flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <ScrollText className="w-3.5 h-3.5 text-[#A83232]" />
-                <span>Browse All Past Notes & Memories</span>
-              </button>
-            )}
-
           </div>
-
-        </div>
+        ) : (
+          <div className="px-4 py-3 border-t border-stone-100 bg-white flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenStatusPicker && onOpenStatusPicker();
+              }}
+              className="w-full py-2 px-4 rounded-full bg-[#2D6A4F] hover:bg-[#1E4D38] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+            >
+              <span>Update Note</span>
+            </button>
+          </div>
+        )}
 
       </div>
     </div>

@@ -54,6 +54,7 @@ import {
   markStoryAsViewed,
   deleteStoryFromCloud,
   updateUserStatus,
+  deleteUserStatus,
   subscribeToStatuses,
   subscribeToStatusHistory,
   markStatusHistoryAsViewed,
@@ -745,6 +746,23 @@ export default function App() {
     }
   }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
 
+  const handleDeleteUserStatus = useCallback(async () => {
+    if (!user) return;
+    const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
+    const userId = user.uid || 'demo-user-1';
+    await deleteUserStatus(pairCode, userId);
+    setStatuses(prev => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+    if (selectedStatusForDetail?.userId === userId) {
+      setSelectedStatusForDetail(null);
+      setIsStatusDetailOpen(false);
+    }
+    setIsStatusPickerOpen(false);
+  }, [pairInfo?.code, user, selectedStatusForDetail?.userId]);
+
   const handleReactToStatus = useCallback(async (targetUserId, emoji) => {
     if (!targetUserId || !user) return;
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
@@ -1112,13 +1130,14 @@ export default function App() {
         <MusicPlayer isCallActive={isCallModalOpen} />
       )}
 
-      {/* Top Navbar with integrated Our Stories & Call Partner & Chat Sanctuary */}
+      {/* Top Navbar with integrated Our Stories, Status Thought Bubbles, Call Partner & Chat Sanctuary */}
       <Navbar
         user={user}
         pairInfo={pairInfo}
         isLettersUnlocked={isLettersUnlocked}
         stories={stories}
         statuses={statuses}
+        statusHistory={statusHistory}
         partnerPresence={partnerPresence}
         hasSeenStoriesIntro={hasSeenStoriesIntro}
         unreadMessageCount={unreadMessageCount}
@@ -1134,6 +1153,12 @@ export default function App() {
         }}
         onOpenStoryArchive={() => setIsStoryArchiveOpen(true)}
         onOpenStoryIntro={() => setIsStoryIntroOpen(true)}
+        onOpenStatusPicker={() => setIsStatusPickerOpen(true)}
+        onOpenStatusDetail={(statusDoc) => {
+          setSelectedStatusForDetail(statusDoc);
+          setIsStatusDetailOpen(true);
+        }}
+        onOpenStatusHistory={handleOpenStatusHistory}
         onOpenBucketList={() => setIsBucketListOpen(true)}
         onOpenCallPrompt={() => setIsCallPromptOpen(true)}
         onOpenMessenger={handleOpenMessenger}
@@ -1369,6 +1394,8 @@ export default function App() {
         pairInfo={pairInfo}
         onReactToStatus={handleReactToStatus}
         onSendCheer={handleSendCheerToStatus}
+        onSendChatMessage={handleSendMessage}
+        onOpenChat={() => setIsMessengerOpen(true)}
         onMarkStatusAsViewed={handleMarkStatusAsViewed}
         onOpenStatusPicker={() => {
           setIsStatusDetailOpen(false);
@@ -1442,6 +1469,7 @@ export default function App() {
         onClose={() => setIsKnowMeFacilityOpen(false)}
         currentUser={user}
         pairInfo={pairInfo}
+        partnerPhoto={partnerPresence?.userPhoto || Object.values(statuses || {}).find(s => s.userId !== (user?.uid || 'demo-user-1'))?.userPhoto || pairInfo?.user2?.photo || ''}
         answers={knowMeAnswers}
         onUpdateAnswer={handleUpdateKnowMeAnswer}
         onDeleteAnswer={handleDeleteKnowMeAnswer}

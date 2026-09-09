@@ -22,6 +22,7 @@ export default function KnowMeFacilityModal({
   onClose,
   currentUser,
   pairInfo,
+  partnerPhoto: propPartnerPhoto,
   answers = [],
   onUpdateAnswer,
   onDeleteAnswer,
@@ -35,8 +36,8 @@ export default function KnowMeFacilityModal({
   const partnerName = currentUserName === user2Name ? 'Jay' : user2Name;
 
   const isJay = currentUserName === 'Jay';
-  const myPhoto = currentUser?.photoURL || (isJay ? pairInfo?.user1?.photo : pairInfo?.user2?.photo) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100';
-  const partnerPhoto = (isJay ? pairInfo?.user2?.photo : pairInfo?.user1?.photo) || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100';
+  const myPhoto = currentUser?.photoURL || (isJay ? pairInfo?.user1?.photo : pairInfo?.user2?.photo) || '';
+  const partnerPhoto = propPartnerPhoto || (isJay ? pairInfo?.user2?.photo : pairInfo?.user1?.photo) || '';
 
   // Active Author Tab: 'me' | 'partner'
   const [activeTab, setActiveTab] = useState('me');
@@ -351,7 +352,9 @@ export default function KnowMeFacilityModal({
               const isEditing = editingAnswerId === item.id;
               const reactionsMap = item.reactions || {};
               const authorDisplayName = item.authorName || (isMine ? currentUserName : partnerName);
-              const authorPhoto = isMine ? myPhoto : partnerPhoto;
+              const authorPhoto = isMine 
+                ? (item.authorPhoto || myPhoto) 
+                : (item.authorPhoto || partnerPhoto);
 
               return (
                 <div

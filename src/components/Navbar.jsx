@@ -16,7 +16,8 @@ import {
   MessageCircleHeart,
   ExternalLink,
   FolderHeart,
-  ChevronRight
+  ChevronRight,
+  ScrollText
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
 import { getNickname } from '../utils/nicknames';
@@ -28,6 +29,7 @@ export default function Navbar({
   isLettersUnlocked,
   stories = [],
   statuses = {},
+  statusHistory = [],
   partnerPresence,
   hasSeenStoriesIntro = false,
   unreadMessageCount = 0,
@@ -41,6 +43,7 @@ export default function Navbar({
   onOpenStoryIntro,
   onOpenStatusPicker,
   onOpenStatusDetail,
+  onOpenStatusHistory,
   onOpenBucketList,
   onOpenCallPrompt,
   onOpenMessenger,
@@ -49,7 +52,6 @@ export default function Navbar({
   const [phtTime, setPhtTime] = useState(getCurrentPHT().fullString);
   const [countdown, setCountdown] = useState(getCountdownToTarget(pairInfo?.targetUnlockDate));
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
   const [partnerNoStoryToast, setPartnerNoStoryToast] = useState(false);
 
   // Live PHT Clock & Countdown Ticker
@@ -61,33 +63,33 @@ export default function Navbar({
     return () => clearInterval(timer);
   }, [pairInfo]);
 
-  // Compute active (non-expired <24h) stories
-  const now = Date.now();
-  const activeStories = stories.filter(s => {
-    if (!s.expiresAtIso) return true;
-    return new Date(s.expiresAtIso).getTime() > now;
-  });
-
   const currentUserId = user?.uid || 'demo-user-1';
   const currentUserName = getNickname(user?.displayName) || 'You';
   const user2Name = getNickname(pairInfo?.user2?.name) || 'Partner';
   const partnerName = currentUserName === user2Name ? 'Jay' : user2Name;
 
+  // Active Stories (< 24h)
+  const now = Date.now();
+  const activeStories = (stories || []).filter(s => {
+    if (!s.expiresAtIso) return true;
+    return new Date(s.expiresAtIso).getTime() > now;
+  });
+
   const myActiveStories = activeStories.filter(s => s.authorId === currentUserId);
   const partnerActiveStories = activeStories.filter(s => s.authorId !== currentUserId);
-
-  // Get partner's photo from their stories, status, or pairInfo
-  const partnerPhoto = partnerActiveStories[0]?.authorPhoto 
-    || Object.values(statuses || {}).find(s => s.userId !== currentUserId)?.userPhoto
-    || pairInfo?.user2?.photo
-    || '';
 
   // Status notes
   const myStatus = statuses?.[currentUserId];
   const partnerStatus = Object.values(statuses || {}).find(s => s.userId !== currentUserId);
 
-  // Check if there are UNSEEN stories for the logged-in user
-  const myHasUnseen = myActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
+  // Check if partner's status is unseen
+  const isPartnerStatusUnseen = Boolean(
+    partnerStatus && 
+    Array.isArray(partnerStatus.viewedBy) && 
+    !partnerStatus.viewedBy.includes(currentUserId)
+  );
+
+  // Check if partner has unseen stories
   const partnerHasUnseen = partnerActiveStories.some(s => !(s.viewedBy || []).includes(currentUserId));
 
   // Check if ALL my stories have been seen by partner (only then show the "seen" badge)
@@ -100,7 +102,18 @@ export default function Navbar({
     !(s.viewedBy || []).some(id => id !== currentUserId)
   );
 
+  const myPhoto = user?.photoURL || pairInfo?.user1?.photo || '';
+  const partnerPhoto = partnerActiveStories[0]?.authorPhoto 
+    || partnerPresence?.userPhoto 
+    || partnerStatus?.userPhoto 
+    || pairInfo?.user2?.photo 
+    || '';
+
   const partnerPresenceInfo = getPresenceInfo(partnerPresence);
+
+  const unreadHistoryCount = (statusHistory || []).filter(
+    n => n.userId !== currentUserId && !n.viewedBy?.includes(currentUserId)
+  ).length;
 
   return (
     <header className="sticky top-0 z-40 bg-[#F6F2EB]/95 backdrop-blur-md border-b border-[#E2D7C7] px-3 sm:px-4 lg:px-8 py-2 sm:py-2.5 transition-all shadow-sm">
@@ -122,7 +135,7 @@ export default function Navbar({
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            OUR STORIES NAVBAR HUB (Avatars + Add Story + Memory Log)
+            OUR STORIES NAVBAR HUB (Avatars + Add Story + Memory Log + Call + Messenger)
            ───────────────────────────────────────────────────────────── */}
         {user && (
           <div className="flex items-center gap-2 sm:gap-3.5 bg-[#FAF5EC] border border-[#D2C3B0]/70 py-1 sm:py-1.5 px-2.5 sm:px-3.5 rounded-full shadow-xs">
@@ -139,9 +152,9 @@ export default function Navbar({
                 type="button"
                 onClick={() => {
                   if (myActiveStories.length > 0) {
-                    onOpenStoryViewer(myActiveStories);
+                    onOpenStoryViewer && onOpenStoryViewer(myActiveStories);
                   } else {
-                    onOpenStoryCreator();
+                    onOpenStoryCreator && onOpenStoryCreator();
                   }
                 }}
                 className={`relative rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center p-[2px] cursor-pointer ${
@@ -160,7 +173,7 @@ export default function Navbar({
                 }
               >
                 <img
-                  src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                  src={myPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                   alt={currentUserName}
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white"
                 />
@@ -182,7 +195,7 @@ export default function Navbar({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onOpenStoryCreator();
+                  onOpenStoryCreator && onOpenStoryCreator();
                 }}
                 onTouchEnd={(e) => {
                   e.stopPropagation();
@@ -201,7 +214,7 @@ export default function Navbar({
                 type="button"
                 onClick={() => {
                   if (partnerActiveStories.length > 0) {
-                    onOpenStoryViewer(partnerActiveStories);
+                    onOpenStoryViewer && onOpenStoryViewer(partnerActiveStories);
                   } else {
                     setPartnerNoStoryToast(true);
                     setTimeout(() => setPartnerNoStoryToast(false), 3000);
@@ -263,21 +276,21 @@ export default function Navbar({
               )}
             </div>
 
-              {/* Memory Log / Story Archive Circular Button */}
-              <div className="relative group shrink-0">
-                <button
-                  type="button"
-                  onClick={onOpenStoryArchive}
-                  className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-dashed border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
-                  title="View private Story Archive & Memory Log"
-                >
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-white flex items-center justify-center text-[#A83232] transition-colors shadow-xs">
-                    <BookOpen className="w-4 h-4 text-[#A83232]" />
-                  </div>
-                </button>
-              </div>
+            {/* Memory Log / Story Archive Circular Button */}
+            <div className="relative group shrink-0">
+              <button
+                type="button"
+                onClick={onOpenStoryArchive}
+                className="relative p-0.5 rounded-full transition-transform group-hover:scale-105 active:scale-95 flex items-center justify-center border-2 border-dashed border-[#D2C3B0] hover:border-[#A83232] cursor-pointer"
+                title="View private Story Archive & Memory Log"
+              >
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-white flex items-center justify-center text-[#A83232] transition-colors shadow-xs">
+                  <BookOpen className="w-4 h-4 text-[#A83232]" />
+                </div>
+              </button>
+            </div>
 
-              {/* Call Partner Button */}
+            {/* Call Partner Button */}
             {onOpenCallPrompt && (
               <div className="relative group shrink-0">
                 <button
@@ -485,6 +498,32 @@ export default function Navbar({
                           {unreadMessageCount > 0 ? (
                             <span className="bg-[#A83232] text-[#F8E3B6] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shadow-2xs shrink-0">
                               {unreadMessageCount} new
+                            </span>
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />
+                          )}
+                        </button>
+                      )}
+
+                      {/* Past Notes Log */}
+                      {onOpenStatusHistory && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            onOpenStatusHistory();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[#36271C] hover:bg-[#FAF5EC] hover:text-[#A83232] transition-colors cursor-pointer group text-left"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#FAF5EC] group-hover:bg-[#EFE9DE] border border-[#E2D7C7] flex items-center justify-center text-[#A83232] shadow-2xs shrink-0">
+                              <ScrollText className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="font-medium truncate">Past Notes Log</span>
+                          </div>
+                          {unreadHistoryCount > 0 ? (
+                            <span className="bg-[#A83232] text-[#F8E3B6] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shadow-2xs shrink-0">
+                              {unreadHistoryCount} new
                             </span>
                           ) : (
                             <ChevronRight className="w-3.5 h-3.5 text-[#A69784] group-hover:text-[#A83232] transition-transform group-hover:translate-x-0.5 shrink-0" />

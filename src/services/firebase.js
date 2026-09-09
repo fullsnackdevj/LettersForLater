@@ -817,11 +817,11 @@ export async function updateUserStatus(pairCode, user, statusData) {
     userId,
     userName,
     userPhoto,
-    statusId: statusData.statusId || 'working_now',
-    statusText: statusData.statusText || 'Working now',
-    emoji: statusData.emoji || '💻',
-    category: statusData.category || 'work_school',
-    customNote: statusData.customNote || '',
+    statusId: statusData.statusId || `note_${Date.now()}`,
+    statusText: statusData.statusText || statusData.customNote || 'Note',
+    emoji: statusData.emoji ?? '',
+    category: statusData.category || 'daily',
+    customNote: statusData.customNote || statusData.statusText || '',
     updatedAtPHT: pht.fullString,
     updatedAtIso: pht.isoString,
     reactions: {},
@@ -866,6 +866,31 @@ export async function updateUserStatus(pairCode, user, statusData) {
   saveLocalStatusHistory(localHist);
 
   return statusDoc;
+}
+
+export async function deleteUserStatus(pairCode, userId) {
+  const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const targetId = userId || 'demo-user-1';
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const statusRef = doc(db, 'pairs', cleanCode, 'statuses', targetId);
+      await deleteDoc(statusRef);
+    } catch (err) {
+      console.warn('Failed to delete status in firestore:', err);
+    }
+  }
+
+  // Local storage fallback for active status
+  try {
+    const local = getLocalStatuses();
+    if (local[cleanCode] && local[cleanCode][targetId]) {
+      delete local[cleanCode][targetId];
+      saveLocalStatuses(local);
+    }
+  } catch (err) {
+    console.warn('Failed to delete status in local storage:', err);
+  }
 }
 
 export function subscribeToStatuses(pairCode, callback) {

@@ -1,9 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { 
-  Edit3, 
+  FileText,
   Eye, 
-  MessageCircleHeart, 
-  Video,
   ScrollText
 } from 'lucide-react';
 import { getNickname } from '../utils/nicknames';
@@ -73,38 +71,6 @@ export default function CoupleStatusBanner({
   return (
     <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] py-2 px-2.5 sm:px-4 select-none shadow-xs overflow-hidden">
       <div className="max-w-4xl mx-auto">
-
-        {/* Top Header Bar for Live Notes & History */}
-        <div className="flex items-center justify-between px-1 mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs">💭</span>
-            <span className="text-[10px] font-bold text-[#A83232] uppercase tracking-wider">
-              Couple Live Notes
-            </span>
-          </div>
-
-          {onOpenStatusHistory && (
-            <button
-              type="button"
-              onClick={onOpenStatusHistory}
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white hover:bg-[#FDFBF7] border border-[#D2C3B0] hover:border-[#A83232] text-[#36271C] text-[10px] font-bold shadow-2xs transition-all cursor-pointer group active:scale-95"
-              title="View all past notes & memories"
-            >
-              <ScrollText className="w-3 h-3 text-[#A83232]" />
-              <span>Past Notes</span>
-              {unreadHistoryCount > 0 ? (
-                <span className="bg-[#A83232] text-[#F8E3B6] text-[9px] font-bold px-1.5 py-0.2 rounded-full shadow-2xs animate-pulse">
-                  {unreadHistoryCount} new
-                </span>
-              ) : statusHistory?.length > 0 ? (
-                <span className="text-[9px] text-[#9E8B75]">
-                  ({statusHistory.length})
-                </span>
-              ) : null}
-            </button>
-          )}
-        </div>
-        
         {/* Horizontal Snap Carousel with Peek Effect */}
         <div 
           ref={scrollContainerRef}
@@ -128,15 +94,15 @@ export default function CoupleStatusBanner({
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 
-                {/* Compact Avatar / Emoji */}
+                {/* Compact Note Icon */}
                 <div className="relative shrink-0">
-                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shadow-xs group-hover:scale-105 transition-transform ${
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform ${
                     isPartnerStatusUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]'
-                      : 'bg-[#FAF5EC] border border-[#D4AF37]'
+                      : 'bg-[#EAF3EC] border border-[#D5E7DA]'
                   }`}>
-                    <div className="w-full h-full rounded-xl bg-[#FAF5EC] flex items-center justify-center">
-                      {partnerStatus?.emoji || '💭'}
+                    <div className="w-full h-full rounded-xl bg-[#EAF3EC] flex items-center justify-center text-[#2D6A4F]">
+                      <FileText className="w-4 h-4 text-[#2D6A4F]" />
                     </div>
                   </div>
                   {partnerSeen && !isPartnerStatusUnseen && (
@@ -176,52 +142,19 @@ export default function CoupleStatusBanner({
                   </div>
 
                   <p className="text-[11px] sm:text-xs font-bold text-[#36271C] truncate leading-tight">
-                    {partnerStatus?.statusText || `${partnerName} is idle`}
+                    {partnerStatus?.customNote || partnerStatus?.statusText || `${partnerName} hasn't shared a note yet`}
                   </p>
 
-                  {partnerStatus?.lastCheer ? (
+                  {partnerStatus?.lastCheer && (
                     <p className="text-[10px] text-[#A83232] font-semibold flex items-center gap-1 truncate -mt-0.5">
                       <span>💬</span>
                       <span className="truncate">
                         {partnerStatus.lastCheer.fromId === currentUserId ? 'You:' : `${getNickname(partnerStatus.lastCheer.fromName) || partnerName}:`} "{partnerStatus.lastCheer.text}"
                       </span>
                     </p>
-                  ) : partnerStatus?.customNote ? (
-                    <p className="text-[10px] text-[#7A6855] italic font-handwriting text-xs truncate -mt-0.5">
-                      "{partnerStatus.customNote}"
-                    </p>
-                  ) : null}
+                  )}
                 </div>
 
-              </div>
-
-              {/* Compact Right Action Buttons */}
-              <div className="shrink-0 flex items-center gap-1.5">
-                {onOpenCallPrompt && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenCallPrompt();
-                    }}
-                    className="p-1.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE9DE] border border-[#D2C3B0] hover:border-[#A83232] text-[#A83232] transition-all flex items-center justify-center cursor-pointer group-hover:scale-105 active:scale-95 shadow-2xs"
-                    title={`Call ${partnerName}`}
-                  >
-                    <Video className="w-3.5 h-3.5 text-[#A83232]" />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (partnerStatus) onOpenStatusDetail(partnerStatus);
-                  }}
-                  className="px-2.5 py-1 rounded-xl bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-[11px] font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer group-hover:scale-105 active:scale-95"
-                >
-                  <MessageCircleHeart className="w-3 h-3" />
-                  <span>React</span>
-                </button>
               </div>
 
             </div>
@@ -244,15 +177,15 @@ export default function CoupleStatusBanner({
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 
-                {/* Compact Avatar / Emoji */}
+                {/* Compact Note Icon */}
                 <div className="relative shrink-0">
-                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shadow-xs group-hover:scale-105 transition-transform ${
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform ${
                     isMyStatusUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]'
-                      : 'bg-[#FAF5EC] border border-[#D2C3B0] group-hover:border-[#A83232]'
+                      : 'bg-[#EAF3EC] border border-[#D5E7DA] group-hover:border-[#2D6A4F]'
                   }`}>
-                    <div className="w-full h-full rounded-xl bg-[#FAF5EC] flex items-center justify-center">
-                      {myStatus?.emoji || '💬'}
+                    <div className="w-full h-full rounded-xl bg-[#EAF3EC] flex items-center justify-center text-[#2D6A4F]">
+                      <FileText className="w-4 h-4 text-[#2D6A4F]" />
                     </div>
                   </div>
                   {myStatusSeen && !isMyStatusUnseen && (
@@ -286,42 +219,19 @@ export default function CoupleStatusBanner({
                   </div>
 
                   <p className="text-[11px] sm:text-xs font-bold text-[#36271C] truncate leading-tight">
-                    {myStatus?.statusText || '+ Tap to set your mood or activity'}
+                    {myStatus?.customNote || myStatus?.statusText || '+ Tap to share a thought...'}
                   </p>
 
-                  {myStatus?.lastCheer ? (
+                  {myStatus?.lastCheer && (
                     <p className="text-[10px] text-[#A83232] font-semibold flex items-center gap-1 truncate -mt-0.5">
                       <span>💬</span>
                       <span className="truncate">
                         {myStatus.lastCheer.fromId === currentUserId ? 'You:' : `${getNickname(myStatus.lastCheer.fromName) || partnerName}:`} "{myStatus.lastCheer.text}"
                       </span>
                     </p>
-                  ) : myStatus?.customNote ? (
-                    <p className="text-[10px] text-[#7A6855] italic font-handwriting text-xs truncate -mt-0.5">
-                      "{myStatus.customNote}"
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-[#9E8B75] truncate -mt-0.5">
-                      Tap to update note
-                    </p>
                   )}
                 </div>
 
-              </div>
-
-              {/* Compact Right Action Button */}
-              <div className="shrink-0 flex items-center">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenStatusPicker();
-                  }}
-                  className="px-2.5 py-1 rounded-xl bg-[#FAF5EC] hover:bg-[#EAE2D3] border border-[#D2C3B0] hover:border-[#A83232] text-[#36271C] text-[11px] font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer group-hover:scale-105 active:scale-95"
-                >
-                  <Edit3 className="w-3 h-3 text-[#A83232]" />
-                  <span>{myStatus ? 'Update' : '+ Set'}</span>
-                </button>
               </div>
 
             </div>

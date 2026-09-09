@@ -921,8 +921,15 @@ export default function MessengerModal({
                     {/* Quoted Reply Snippet */}
                     {msg.replyTo && (
                       <div className="mb-2 p-2 rounded-2xl bg-black/5 border-l-3 border-[#A83232] text-xs space-y-0.5">
-                        <span className="font-bold text-[10px] text-[#A83232] block">
-                          Replying to {msg.replyTo.senderName}
+                        <span className="font-bold text-[10px] text-[#A83232] flex items-center gap-1">
+                          {msg.replyTo.isNoteReply ? (
+                            <>
+                              <span>💭</span>
+                              <span>Replied to {msg.replyTo.senderName}'s Note</span>
+                            </>
+                          ) : (
+                            <span>Replying to {msg.replyTo.senderName}</span>
+                          )}
                         </span>
                         <p className="text-[#4A3B2C] truncate italic text-[11px]">
                           "{msg.replyTo.text}"
