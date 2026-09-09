@@ -8,21 +8,38 @@ import {
   doc, 
   setDoc, 
   getDoc, 
+  getDocs,
   updateDoc, 
   deleteDoc, 
   collection, 
   addDoc, 
   onSnapshot 
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './firebase';
+import { db, isFirebaseConfigured, sendChatMessage } from './firebase';
 
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
-  ]
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
+  ],
+  iceCandidatePoolSize: 10
 };
+
+// Helper to remove obsolete ICE candidates from subcollections
+async function purgeOldCandidates(colRef) {
+  try {
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      const deletePromises = snap.docs.map(d => deleteDoc(d.ref).catch(() => {}));
+      await Promise.all(deletePromises);
+    }
+  } catch (e) {
+    console.warn('[WebRTC] Error purging old candidates:', e);
+  }
+}
 
 // Audio Ringtone Synthesizer using Web Audio API (No external mp3 assets required)
 class CallRingtonePlayer {
@@ -263,9 +280,12 @@ export async function startOutgoingCall({
   const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
   const callerId = callerUser?.uid || 'demo-user-1';
   const receiverId = receiverUser?.uid || 'demo-partner-2';
+  const callSessionId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   const pc = new RTCPeerConnection(ICE_SERVERS);
   const activeUnsubscribes = [];
+  const candidateQueue = [];
+  let isRemoteDescriptionSet = false;
 
   // Add local stream tracks to PeerConnection
   if (localStream) {
@@ -274,17 +294,78 @@ export async function startOutgoingCall({
     });
   }
 
-  // Handle incoming remote media tracks
+  // Handle incoming remote media tracks reliably across browsers
+  const remoteStream = new MediaStream();
   pc.ontrack = (event) => {
+    console.log('[WebRTC] Caller ontrack received:', event.track.kind, event.track.id);
     if (event.streams && event.streams[0]) {
-      onRemoteStream(event.streams[0]);
+      event.streams[0].getTracks().forEach(track => {
+        if (!remoteStream.getTracks().some(t => t.id === track.id)) {
+          remoteStream.addTrack(track);
+        }
+      });
+    } else if (event.track) {
+      if (!remoteStream.getTracks().some(t => t.id === event.track.id)) {
+        remoteStream.addTrack(event.track);
+      }
     }
+
+    event.track.onunmute = () => {
+      onRemoteStream(new MediaStream(remoteStream.getTracks()));
+    };
+
+    onRemoteStream(new MediaStream(remoteStream.getTracks()));
   };
 
   // Connection state changes
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+    console.log('[WebRTC] Caller connectionState:', pc.connectionState);
+    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
       onCallStateChange({ status: 'ended' });
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log('[WebRTC] Caller iceConnectionState:', pc.iceConnectionState);
+    if (pc.iceConnectionState === 'failed') {
+      onCallStateChange({ status: 'ended' });
+    }
+  };
+
+  const addCandidate = async (candidateData) => {
+    if (!candidateData || !candidateData.candidate) return;
+    // Discard candidates from prior calls
+    if (candidateData.callSessionId && candidateData.callSessionId !== callSessionId) {
+      return;
+    }
+
+    const rtcCandidate = new RTCIceCandidate({
+      candidate: candidateData.candidate,
+      sdpMid: candidateData.sdpMid,
+      sdpMLineIndex: candidateData.sdpMLineIndex,
+      usernameFragment: candidateData.usernameFragment
+    });
+
+    if (!isRemoteDescriptionSet || !pc.remoteDescription) {
+      candidateQueue.push(rtcCandidate);
+    } else {
+      try {
+        await pc.addIceCandidate(rtcCandidate);
+      } catch (err) {
+        console.warn('[WebRTC] Caller addIceCandidate error:', err);
+      }
+    }
+  };
+
+  const flushCandidateQueue = async () => {
+    isRemoteDescriptionSet = true;
+    while (candidateQueue.length > 0) {
+      const cand = candidateQueue.shift();
+      try {
+        await pc.addIceCandidate(cand);
+      } catch (err) {
+        console.warn('[WebRTC] Caller flush candidate error:', err);
+      }
     }
   };
 
@@ -293,19 +374,31 @@ export async function startOutgoingCall({
     const callerCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'callerCandidates');
     const receiverCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'receiverCandidates');
 
-    // Collect ICE candidates and push to Firestore
+    // Purge any stale candidates from past sessions to ensure a clean start
+    purgeOldCandidates(callerCandidatesCol);
+    purgeOldCandidates(receiverCandidatesCol);
+
+    // Collect ICE candidates and push to Firestore with callSessionId
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(() => {});
+      if (event.candidate && event.candidate.candidate) {
+        addDoc(callerCandidatesCol, {
+          ...event.candidate.toJSON(),
+          callSessionId,
+          createdAt: Date.now()
+        }).catch((e) => console.warn('[WebRTC] Error saving caller candidate:', e));
       }
     };
 
     // Create SDP Offer
-    const offerDescription = await pc.createOffer();
+    const offerDescription = await pc.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: callType === 'video'
+    });
     await pc.setLocalDescription(offerDescription);
 
     const callPayload = {
       pairCode: cleanCode,
+      callSessionId,
       status: 'ringing',
       callType,
       createdAtIso: new Date().toISOString(),
@@ -340,6 +433,7 @@ export async function startOutgoingCall({
       if (!pc.currentRemoteDescription && data?.answer) {
         const answerDescription = new RTCSessionDescription(data.answer);
         await pc.setRemoteDescription(answerDescription);
+        await flushCandidateQueue();
       }
     });
     activeUnsubscribes.push(unsubDoc);
@@ -348,8 +442,7 @@ export async function startOutgoingCall({
     const unsubIce = onSnapshot(receiverCandidatesCol, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const candidateData = change.doc.data();
-          pc.addIceCandidate(new RTCIceCandidate(candidateData)).catch(() => {});
+          addCandidate(change.doc.data());
         }
       });
     });
@@ -382,8 +475,11 @@ export async function acceptIncomingCall({
   onCallStateChange
 }) {
   const cleanCode = (pairCode || '#JayFinallyGotAKiss').toUpperCase();
+  const callSessionId = callData?.callSessionId || `call_${Date.now()}`;
   const pc = new RTCPeerConnection(ICE_SERVERS);
   const activeUnsubscribes = [];
+  const candidateQueue = [];
+  let isRemoteDescriptionSet = false;
 
   // Add local stream tracks to PeerConnection
   if (localStream) {
@@ -392,16 +488,77 @@ export async function acceptIncomingCall({
     });
   }
 
-  // Handle incoming remote media tracks
+  // Handle incoming remote media tracks reliably across browsers
+  const remoteStream = new MediaStream();
   pc.ontrack = (event) => {
+    console.log('[WebRTC] Receiver ontrack received:', event.track.kind, event.track.id);
     if (event.streams && event.streams[0]) {
-      onRemoteStream(event.streams[0]);
+      event.streams[0].getTracks().forEach(track => {
+        if (!remoteStream.getTracks().some(t => t.id === track.id)) {
+          remoteStream.addTrack(track);
+        }
+      });
+    } else if (event.track) {
+      if (!remoteStream.getTracks().some(t => t.id === event.track.id)) {
+        remoteStream.addTrack(event.track);
+      }
     }
+
+    event.track.onunmute = () => {
+      onRemoteStream(new MediaStream(remoteStream.getTracks()));
+    };
+
+    onRemoteStream(new MediaStream(remoteStream.getTracks()));
   };
 
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+    console.log('[WebRTC] Receiver connectionState:', pc.connectionState);
+    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
       onCallStateChange({ status: 'ended' });
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log('[WebRTC] Receiver iceConnectionState:', pc.iceConnectionState);
+    if (pc.iceConnectionState === 'failed') {
+      onCallStateChange({ status: 'ended' });
+    }
+  };
+
+  const addCandidate = async (candidateData) => {
+    if (!candidateData || !candidateData.candidate) return;
+    // Discard candidates from prior calls
+    if (candidateData.callSessionId && candidateData.callSessionId !== callSessionId) {
+      return;
+    }
+
+    const rtcCandidate = new RTCIceCandidate({
+      candidate: candidateData.candidate,
+      sdpMid: candidateData.sdpMid,
+      sdpMLineIndex: candidateData.sdpMLineIndex,
+      usernameFragment: candidateData.usernameFragment
+    });
+
+    if (!isRemoteDescriptionSet || !pc.remoteDescription) {
+      candidateQueue.push(rtcCandidate);
+    } else {
+      try {
+        await pc.addIceCandidate(rtcCandidate);
+      } catch (err) {
+        console.warn('[WebRTC] Receiver addIceCandidate error:', err);
+      }
+    }
+  };
+
+  const flushCandidateQueue = async () => {
+    isRemoteDescriptionSet = true;
+    while (candidateQueue.length > 0) {
+      const cand = candidateQueue.shift();
+      try {
+        await pc.addIceCandidate(cand);
+      } catch (err) {
+        console.warn('[WebRTC] Receiver flush candidate error:', err);
+      }
     }
   };
 
@@ -410,16 +567,21 @@ export async function acceptIncomingCall({
     const callerCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'callerCandidates');
     const receiverCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'receiverCandidates');
 
-    // Collect ICE candidates and push to Firestore
+    // Collect ICE candidates and push to Firestore with callSessionId
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(receiverCandidatesCol, event.candidate.toJSON()).catch(() => {});
+      if (event.candidate && event.candidate.candidate) {
+        addDoc(receiverCandidatesCol, {
+          ...event.candidate.toJSON(),
+          callSessionId,
+          createdAt: Date.now()
+        }).catch((e) => console.warn('[WebRTC] Error saving receiver candidate:', e));
       }
     };
 
-    // Set Remote Description from Caller's Offer
+    // Set Remote Description from Caller's Offer and drain any early candidates
     if (callData.offer) {
       await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+      await flushCandidateQueue();
     }
 
     // Create SDP Answer
@@ -429,6 +591,7 @@ export async function acceptIncomingCall({
     await updateDoc(callDocRef, {
       status: 'connected',
       connectedAtIso: new Date().toISOString(),
+      callSessionId,
       answer: {
         type: answerDescription.type,
         sdp: answerDescription.sdp
@@ -449,8 +612,7 @@ export async function acceptIncomingCall({
     const unsubIce = onSnapshot(callerCandidatesCol, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const candidateData = change.doc.data();
-          pc.addIceCandidate(new RTCIceCandidate(candidateData)).catch(() => {});
+          addCandidate(change.doc.data());
         }
       });
     });
@@ -483,14 +645,51 @@ export async function terminateCall(pairCode, status = 'ended') {
       const callDocRef = doc(db, 'pairs', cleanCode, 'calls', 'active');
       const snap = await getDoc(callDocRef);
       if (snap.exists()) {
+        const data = snap.data();
+        const wasConnected = Boolean(data.connectedAtIso || data.status === 'connected');
+
+        // Post missed call notification to chat if the call was never answered
+        if (!wasConnected && !data.missedLogged && (status === 'ended' || status === 'rejected' || status === 'unanswered')) {
+          try {
+            const caller = data.caller || {};
+            const callType = data.callType || 'video';
+            const text = callType === 'audio' ? '📞 Missed audio call' : '📹 Missed video call';
+
+            await sendChatMessage(cleanCode, {
+              uid: caller.uid || 'demo-user-1',
+              displayName: caller.name || 'Partner',
+              photoURL: caller.photo || ''
+            }, {
+              text,
+              callInfo: {
+                status: 'missed',
+                callType,
+                callerId: caller.uid,
+                callerName: caller.name,
+                receiverId: data.receiver?.uid,
+                receiverName: data.receiver?.name,
+                atIso: new Date().toISOString()
+              }
+            });
+          } catch (chatErr) {
+            console.warn('Failed to log missed call to chat widget:', chatErr);
+          }
+        }
+
         await updateDoc(callDocRef, {
           status,
-          endedAtIso: new Date().toISOString()
+          endedAtIso: new Date().toISOString(),
+          missedLogged: true
         });
-        // Remove document after 2.5 seconds to allow remote party to receive 'ended' status
+
+        // Remove document and purge candidate subcollections after 2.5 seconds
         setTimeout(async () => {
           try {
             await deleteDoc(callDocRef);
+            const callerCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'callerCandidates');
+            const receiverCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'receiverCandidates');
+            purgeOldCandidates(callerCandidatesCol);
+            purgeOldCandidates(receiverCandidatesCol);
           } catch (e) {}
         }, 2500);
       }
@@ -500,7 +699,26 @@ export async function terminateCall(pairCode, status = 'ended') {
   }
 
   try {
-    localStorage.removeItem(`lfl_active_call_${cleanCode}`);
+    const localKey = `lfl_active_call_${cleanCode}`;
+    const raw = localStorage.getItem(localKey);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (!data.connectedAtIso && !data.missedLogged) {
+        const caller = data.caller || {};
+        const callType = data.callType || 'video';
+        const text = callType === 'audio' ? '📞 Missed audio call' : '📹 Missed video call';
+        sendChatMessage(cleanCode, caller, {
+          text,
+          callInfo: {
+            status: 'missed',
+            callType,
+            callerId: caller.uid,
+            callerName: caller.name
+          }
+        }).catch(() => {});
+      }
+    }
+    localStorage.removeItem(localKey);
   } catch (e) {}
 }
 

@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Volume2
 } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_PARTNER_PHOTO } from '../utils/nicknames';
 
 export default function CallModal({
   isOpen,
@@ -38,11 +38,14 @@ export default function CallModal({
   const [callDuration, setCallDuration] = useState(0);
   const [floatingHearts, setFloatingHearts] = useState([]);
   const [currentFacingMode, setCurrentFacingMode] = useState(facingMode);
+  const [isRemoteVideoLive, setIsRemoteVideoLive] = useState(false);
+  const [hasAutoplayBlocked, setHasAutoplayBlocked] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const minLocalVideoRef = useRef(null);
   const minRemoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
 
   const isIncoming = callData?.status === 'ringing' && callData?.receiver?.uid === currentUserId;
   const isOutgoing = callData?.status === 'ringing' && callData?.caller?.uid === currentUserId;
@@ -51,23 +54,91 @@ export default function CallModal({
 
   const partner = callData?.caller?.uid === currentUserId ? callData?.receiver : callData?.caller;
   const partnerName = getNickname(partner?.name) || 'Partner';
-  const partnerPhoto = partner?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+  const partnerPhoto = partner?.photo || DEFAULT_PARTNER_PHOTO;
+
+  // Helper to reliably attach media streams and invoke play() with error recovery
+  const attachStream = (mediaEl, stream, isMuted = false) => {
+    if (!mediaEl || !stream) return;
+    if (mediaEl.srcObject !== stream) {
+      mediaEl.srcObject = stream;
+    }
+    mediaEl.muted = isMuted;
+    const playPromise = mediaEl.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('Autoplay error on media element:', err);
+        if (err.name === 'NotAllowedError') {
+          setHasAutoplayBlocked(true);
+        }
+      });
+    }
+  };
+
+  // Callback refs to instantly attach and play streams as soon as elements mount into the DOM
+  const setRemoteAudioEl = (el) => {
+    remoteAudioRef.current = el;
+    if (el && remoteStream) {
+      attachStream(el, remoteStream, false);
+    }
+  };
+
+  const setRemoteVideoEl = (el) => {
+    remoteVideoRef.current = el;
+    if (el && remoteStream) {
+      attachStream(el, remoteStream, false);
+    }
+  };
+
+  const setLocalVideoEl = (el) => {
+    localVideoRef.current = el;
+    if (el && localStream) {
+      attachStream(el, localStream, true);
+    }
+  };
+
+  const setMinRemoteVideoEl = (el) => {
+    minRemoteVideoRef.current = el;
+    if (el && remoteStream) {
+      attachStream(el, remoteStream, false);
+    }
+  };
+
+  const setMinLocalVideoEl = (el) => {
+    minLocalVideoRef.current = el;
+    if (el && localStream) {
+      attachStream(el, localStream, true);
+    }
+  };
+
+  // Dedicated remote audio stream attachment
+  useEffect(() => {
+    if (remoteStream && remoteAudioRef.current) {
+      attachStream(remoteAudioRef.current, remoteStream, false);
+    }
+  }, [remoteStream, isConnected]);
 
   // Attach local media stream to video elements
   useEffect(() => {
     if (localStream) {
-      if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
-      if (minLocalVideoRef.current) minLocalVideoRef.current.srcObject = localStream;
+      attachStream(localVideoRef.current, localStream, true);
+      attachStream(minLocalVideoRef.current, localStream, true);
     }
   }, [localStream, isMinimized, isConnected, isOutgoing]);
 
-  // Attach remote media stream to video elements
+  // Attach remote media stream to video elements and monitor video tracks
   useEffect(() => {
     if (remoteStream) {
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
-      if (minRemoteVideoRef.current) minRemoteVideoRef.current.srcObject = remoteStream;
+      attachStream(remoteVideoRef.current, remoteStream, false);
+      attachStream(minRemoteVideoRef.current, remoteStream, false);
+
+      const videoTracks = remoteStream.getVideoTracks();
+      if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
+        setIsRemoteVideoLive(true);
+      }
+    } else {
+      setIsRemoteVideoLive(false);
     }
-  }, [remoteStream, isMinimized, isConnected]);
+  }, [remoteStream, isMinimized, isConnected, callType]);
 
   // Track call duration when connected
   useEffect(() => {
@@ -82,6 +153,17 @@ export default function CallModal({
     }
     return () => clearInterval(timer);
   }, [isConnected, callData?.connectedAtIso]);
+
+  // Ringing timeout (40 seconds max before auto-ending as missed/unanswered)
+  useEffect(() => {
+    let timeoutId;
+    if (isOutgoing && !isConnected) {
+      timeoutId = setTimeout(() => {
+        if (onEndCall) onEndCall();
+      }, 40000);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [isOutgoing, isConnected, onEndCall]);
 
   // Listen to in-call reactions
   useEffect(() => {
@@ -163,14 +245,17 @@ export default function CallModal({
   // ─────────────────────────────────────────────────────────────
   if (isMinimized && isConnected) {
     return (
-      <div className="fixed bottom-20 sm:bottom-24 right-4 z-50 animate-fadeIn">
+      <div className="fixed bottom-20 sm:bottom-24 right-4 z-70 animate-fadeIn">
+        {/* Continuous dedicated remote audio playback */}
+        <audio ref={setRemoteAudioEl} autoPlay playsInline className="hidden" />
+
         <div className="relative w-44 sm:w-52 bg-[#1C1D24] border-2 border-[#D4AF37] rounded-3xl shadow-2xl overflow-hidden p-2.5 space-y-2 group">
           
           {/* Video or Avatar Thumbnail */}
           <div className="relative w-full aspect-video sm:aspect-4/3 rounded-2xl overflow-hidden bg-black/90 flex items-center justify-center">
             {callType === 'video' && remoteStream ? (
               <video
-                ref={minRemoteVideoRef}
+                ref={setMinRemoteVideoEl}
                 autoPlay
                 playsInline
                 className="w-full h-full object-cover"
@@ -239,8 +324,26 @@ export default function CallModal({
   // 2. FULLSCREEN / MODAL VIEW (Incoming, Outgoing & Connected)
   // ─────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/85 backdrop-blur-lg animate-fadeIn overflow-hidden">
-      
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/85 backdrop-blur-lg animate-fadeIn overflow-hidden">
+      {/* Continuous dedicated remote audio playback for crystal clear voice */}
+      <audio ref={setRemoteAudioEl} autoPlay playsInline className="hidden" />
+
+      {/* Autoplay Unblock Notification (if browser policies temporarily suspended audio/video) */}
+      {hasAutoplayBlocked && (
+        <button
+          type="button"
+          onClick={() => {
+            remoteAudioRef.current?.play().catch(() => {});
+            remoteVideoRef.current?.play().catch(() => {});
+            setHasAutoplayBlocked(false);
+          }}
+          className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-[#D4AF37] hover:bg-[#E5C158] text-[#1C1D24] px-4 py-2 rounded-full font-bold text-xs shadow-2xl flex items-center gap-2 animate-bounce cursor-pointer transition-transform active:scale-95"
+        >
+          <Volume2 className="w-4 h-4 text-[#1C1D24]" />
+          <span>Tap to enable audio & video</span>
+        </button>
+      )}
+
       {/* Floating Reaction Hearts Burst */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
         {floatingHearts.map(h => (
@@ -402,15 +505,45 @@ export default function CallModal({
           <div className="relative flex-1 flex flex-col bg-black overflow-hidden">
             
             {/* Main Stage (Remote Video or Audio Wave Visualizer) */}
-            <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
               
-              {callType === 'video' && remoteStream ? (
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+              {callType === 'video' ? (
+                <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+                  {/* Remote Video Stream */}
+                  <video
+                    ref={setRemoteVideoEl}
+                    autoPlay
+                    playsInline
+                    onPlaying={() => setIsRemoteVideoLive(true)}
+                    onLoadedMetadata={() => setIsRemoteVideoLive(true)}
+                    className={`w-full h-full object-cover transition-opacity duration-500 ${
+                      isRemoteVideoLive ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  />
+
+                  {/* Connecting / Video Stream Establishing Visualizer (Prevents blank black screen) */}
+                  {!isRemoteVideoLive && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#14151B] space-y-5 z-10">
+                      <div className="relative inline-block">
+                        <div className="absolute -inset-3 rounded-full bg-[#D4AF37]/30 animate-ping" />
+                        <img
+                          src={partnerPhoto}
+                          alt={partnerName}
+                          className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-[#D4AF37] shadow-2xl mx-auto"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h3 className="font-serif-vintage font-bold text-2xl text-[#F8E3B6]">
+                          {partnerName}
+                        </h3>
+                        <p className="text-xs text-[#D4AF37] flex items-center justify-center gap-1.5 font-mono animate-pulse">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Establishing secure HD video feed...</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 /* Voice Call Visualizer Screen */
                 <div className="text-center space-y-6 p-6">
@@ -450,7 +583,7 @@ export default function CallModal({
               {callType === 'video' && localStream && (
                 <div className="absolute top-4 right-4 w-28 sm:w-36 aspect-3/4 rounded-2xl overflow-hidden border-2 border-[#D4AF37] shadow-2xl bg-black/80 z-20">
                   <video
-                    ref={localVideoRef}
+                    ref={setLocalVideoEl}
                     autoPlay
                     playsInline
                     muted

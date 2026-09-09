@@ -12,7 +12,7 @@ import {
   Plus,
   MoreHorizontal
 } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_PARTNER_PHOTO, DEFAULT_USER_PHOTO } from '../utils/nicknames';
 import { downloadImage } from '../utils/fileDownloader';
 
 const REACTION_EMOJIS = ['❤️', '🥺', '😂', '😚', '✨', '☕', '🫶'];
@@ -553,7 +553,7 @@ export default function StoryViewerModal({
             >
               {/* Avatar */}
               <img
-                src={currentStory.authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                src={currentStory.authorPhoto || (isMyStory ? DEFAULT_USER_PHOTO : DEFAULT_PARTNER_PHOTO)}
                 alt={currentStory.authorName}
                 className="w-8 h-8 rounded-full object-cover border border-white/80 shrink-0 shadow-sm"
               />

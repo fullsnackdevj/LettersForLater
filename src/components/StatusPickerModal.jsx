@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_USER_PHOTO } from '../utils/nicknames';
 
 // Extracts emoji if user includes one in their text
 const extractEmoji = (text) => {
@@ -100,7 +100,7 @@ export default function StatusPickerModal({
           {/* Profile Avatar */}
           <div className="relative shrink-0">
             <img
-              src={myPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'}
+              src={myPhoto || DEFAULT_USER_PHOTO}
               alt={currentUserName}
               className="w-13 h-13 sm:w-14 sm:h-14 rounded-full object-cover border border-stone-200 shadow-2xs"
             />

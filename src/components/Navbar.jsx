@@ -20,7 +20,7 @@ import {
   ScrollText
 } from 'lucide-react';
 import { getCurrentPHT, getCountdownToTarget } from '../utils/pht';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_USER_PHOTO, DEFAULT_PARTNER_PHOTO } from '../utils/nicknames';
 import { getPresenceInfo } from '../utils/presence';
 
 export default function Navbar({ 
@@ -173,7 +173,7 @@ export default function Navbar({
                 }
               >
                 <img
-                  src={myPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                  src={myPhoto || DEFAULT_USER_PHOTO}
                   alt={currentUserName}
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white"
                 />
@@ -432,7 +432,7 @@ export default function Navbar({
                   <div className="absolute right-0 mt-2 w-64 bg-[#FDFBF7] border border-[#E2D7C7] rounded-2xl shadow-2xl p-4 text-xs z-50 animate-fadeIn">
                     <div className="flex items-center gap-3 pb-3 border-b border-[#EFE9DE]">
                       <img
-                        src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                        src={user.photoURL || DEFAULT_USER_PHOTO}
                         alt={user.displayName}
                         className="w-10 h-10 rounded-full object-cover border border-[#D4AF37]"
                       />

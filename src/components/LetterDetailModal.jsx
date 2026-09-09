@@ -13,7 +13,7 @@ import {
   Check,
   AlertTriangle 
 } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_USER_PHOTO, DEFAULT_PARTNER_PHOTO } from '../utils/nicknames';
 import { downloadImage } from '../utils/fileDownloader';
 import VintageAudioPlayer from './VintageAudioPlayer';
 
@@ -136,7 +136,7 @@ export default function LetterDetailModal({
         <div className="bg-[#FAF5EC] border-b border-[#E2D7C7] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <img
-              src={letter.authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+              src={letter.authorPhoto || (isOwner ? DEFAULT_USER_PHOTO : DEFAULT_PARTNER_PHOTO)}
               alt={letter.authorName}
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-[#D4AF37]"
             />

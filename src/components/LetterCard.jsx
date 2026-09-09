@@ -1,6 +1,6 @@
 import React from 'react';
 import { Lock, Edit, Star, Clock, Image as ImageIcon, Sparkles, FileText, User } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_PARTNER_PHOTO, DEFAULT_USER_PHOTO } from '../utils/nicknames';
 
 export default function LetterCard({ 
   letter, 
@@ -99,7 +99,7 @@ export default function LetterCard({
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <img
-              src={letter.authorPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80'}
+              src={letter.authorPhoto || (isOwner ? DEFAULT_USER_PHOTO : DEFAULT_PARTNER_PHOTO)}
               alt={letter.authorName}
               className="w-6 h-6 rounded-full object-cover border border-[#D4AF37]"
             />

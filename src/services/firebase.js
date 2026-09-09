@@ -180,7 +180,7 @@ export async function signInWithGoogle() {
     uid: 'demo-user-1',
     displayName: 'Jay (Demo User)',
     email: 'jay.demo@lettersforlater.app',
-    photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
+    photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocJcenbddAH2w3KzzQHzl7_5ba69OFBCfw8OiZl5m9gditCGtD0=s96-c'
   };
   localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(demoUser));
   return demoUser;
@@ -1827,6 +1827,7 @@ export async function sendChatMessage(pairCode, user, messageData) {
     mediaUrl: processedMediaUrl,
     audioNote: processedAudio,
     replyTo: messageData.replyTo || null,
+    callInfo: messageData.callInfo || null,
     reactions: {},
     savedToVault: false,
     createdAtIso: pht.isoString,

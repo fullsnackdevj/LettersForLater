@@ -18,7 +18,8 @@ import {
   Camera,
   Edit3,
   Copy,
-  MoreHorizontal
+  MoreHorizontal,
+  PhoneOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import html2canvas from 'html2canvas';
@@ -790,6 +791,7 @@ export default function MessengerModal({
             const isHovered = hoveredMessageId === msg.id;
             const isMenuOpen = activeReactionMenuId === msg.id;
             const standaloneEmojiClass = getEmojiRenderSize(msg.text);
+            const isCallMsg = Boolean(msg.callInfo || (typeof msg.text === 'string' && (msg.text.includes('Missed video call') || msg.text.includes('Missed audio call') || msg.text.includes('Missed voice call') || msg.text.includes('Missed call'))));
 
             return (
               <React.Fragment key={msg.id || idx}>
@@ -910,11 +912,15 @@ export default function MessengerModal({
                   <div
                     onClick={(e) => handleBubbleTap(e, msg)}
                     className={`relative max-w-[85%] sm:max-w-[78%] rounded-3xl p-3 shadow-xs select-none transition-all cursor-pointer ${
-                      standaloneEmojiClass && !msg.mediaUrl && !msg.audioNote && !msg.replyTo
+                      standaloneEmojiClass && !msg.mediaUrl && !msg.audioNote && !msg.replyTo && !isCallMsg
                         ? 'bg-transparent shadow-none border-none p-1'
-                        : isMe
-                          ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FFF9EE] to-[#FFF5EC] border border-[#D4AF37]/60 text-[#36271C] rounded-br-xs ml-8 active:scale-[0.98]'
-                          : 'bg-white border border-[#D2C3B0] text-[#36271C] rounded-bl-xs mr-8 active:scale-[0.98]'
+                        : isCallMsg
+                          ? isMe
+                            ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FFF9EE] to-[#FFF5EC] border border-[#D4AF37]/60 text-[#36271C] rounded-br-xs ml-8 active:scale-[0.98]'
+                            : 'bg-gradient-to-br from-[#FFF5F5] to-[#FFF0F0] border border-red-200/90 text-[#36271C] rounded-bl-xs mr-8 active:scale-[0.98]'
+                          : isMe
+                            ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FFF9EE] to-[#FFF5EC] border border-[#D4AF37]/60 text-[#36271C] rounded-br-xs ml-8 active:scale-[0.98]'
+                            : 'bg-white border border-[#D2C3B0] text-[#36271C] rounded-bl-xs mr-8 active:scale-[0.98]'
                     }`}
                   >
                     
@@ -973,13 +979,59 @@ export default function MessengerModal({
                       </div>
                     )}
 
-                    {/* Message Text (Standalone Big Emojis vs Regular Text) */}
-                    {msg.text && (
-                      <p className={`leading-relaxed break-words font-medium whitespace-pre-wrap ${
-                        standaloneEmojiClass || 'text-xs sm:text-[13px]'
-                      }`}>
-                        {msg.text}
-                      </p>
+                    {/* Call Notification Card vs Regular Message Text */}
+                    {isCallMsg ? (
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center justify-between gap-3 py-1 pr-1 min-w-[210px] sm:min-w-[240px]"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs border ${
+                            isMe 
+                              ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                              : 'bg-red-50 border-red-200 text-red-600'
+                          }`}>
+                            {msg.callInfo?.callType === 'audio' || msg.text?.includes('audio') || msg.text?.includes('voice') ? (
+                              <PhoneOff className="w-4 h-4" />
+                            ) : (
+                              <Video className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold leading-tight truncate ${isMe ? 'text-[#36271C]' : 'text-red-700'}`}>
+                              {isMe 
+                                ? `Outgoing ${(msg.callInfo?.callType || 'video')} call`
+                                : `Missed ${(msg.callInfo?.callType || 'video')} call`
+                              }
+                            </p>
+                            <p className="text-[10px] text-[#9E8B75] font-medium leading-tight mt-0.5 truncate">
+                              {isMe ? 'No answer' : `From ${getNickname(msg.senderName) || partnerName}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {onOpenCallPrompt && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClose();
+                              onOpenCallPrompt();
+                            }}
+                            className="px-2.5 py-1 rounded-full bg-[#A83232] hover:bg-[#8B0000] text-[#F8E3B6] text-[11px] font-bold transition-transform hover:scale-105 active:scale-95 cursor-pointer shrink-0 shadow-2xs"
+                          >
+                            {isMe ? 'Call' : 'Call back'}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      msg.text && (
+                        <p className={`leading-relaxed break-words font-medium whitespace-pre-wrap ${
+                          standaloneEmojiClass || 'text-xs sm:text-[13px]'
+                        }`}>
+                          {msg.text}
+                        </p>
+                      )
                     )}
 
                     {/* Time Stamp & Seen Indicator */}

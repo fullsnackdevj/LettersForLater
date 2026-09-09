@@ -89,7 +89,7 @@ import {
 } from './services/firebase';
 
 import { getCountdownToTarget, getTodayPHTKey, getCurrentPHT } from './utils/pht';
-import { getNickname } from './utils/nicknames';
+import { getNickname, DEFAULT_PARTNER_PHOTO } from './utils/nicknames';
 import { isMessageReadByMe, getLastReadChatTimestamp, setLastReadChatTimestamp } from './utils/chatUtils';
 
 export default function App() {
@@ -97,7 +97,10 @@ export default function App() {
   const [pairInfo, setPairInfo] = useState({
     code: '#JayFinallyGotAKiss',
     targetUnlockDate: '2032-08-06T00:00:00+08:00',
-    user2: { name: 'Partner' }
+    user2: { 
+      name: 'Kisstine',
+      photo: DEFAULT_PARTNER_PHOTO
+    }
   });
   const [letters, setLetters] = useState([]);
   const [stories, setStories] = useState([]);
@@ -452,7 +455,7 @@ export default function App() {
       setActiveCallData(callData);
 
       // Case A: Incoming Call Ringing
-      if (callData.status === 'ringing' && callData.receiver?.uid === currentUserId) {
+      if (callData.status === 'ringing' && (callData.receiver?.uid === currentUserId || callData.caller?.uid !== currentUserId)) {
         setIsCallModalOpen(true);
         setIsCallMinimized(false);
         ringtonePlayer.playIncomingChime();
@@ -486,12 +489,14 @@ export default function App() {
     const pairCode = pairInfo?.code || '#JayFinallyGotAKiss';
     const currentUserId = user.uid || 'demo-user-1';
     const partnerStatus = Object.values(statuses || {}).find(s => s.userId !== currentUserId);
+    const partnerLetter = letters.find(l => l.authorId && l.authorId !== currentUserId);
     const partnerUser = {
-      uid: partnerStatus?.userId || 'partner-id',
-      name: getNickname(pairInfo?.user2?.name) || 'Partner',
-      photo: partnerStatus?.userPhoto || pairInfo?.user2?.photo || ''
+      uid: partnerStatus?.userId || (pairInfo?.user1?.uid === currentUserId ? pairInfo?.user2?.uid : pairInfo?.user1?.uid) || partnerLetter?.authorId || 'cBNfs0ijVfUHVex0DqhGfn3dtO82',
+      name: getNickname(pairInfo?.user2?.name) || getNickname(partnerLetter?.authorName) || 'Kisstine',
+      photo: partnerStatus?.userPhoto || pairInfo?.user2?.photo || partnerLetter?.authorPhoto || DEFAULT_PARTNER_PHOTO
     };
 
+    setIsMessengerOpen(false);
     setIsCallPromptOpen(false);
     setIsCallModalOpen(true);
     setIsCallMinimized(false);
@@ -1495,8 +1500,11 @@ export default function App() {
         isOpen={isCallPromptOpen}
         onClose={() => setIsCallPromptOpen(false)}
         partner={{
-          name: getNickname(pairInfo?.user2?.name) || 'Partner',
-          photo: Object.values(statuses || {}).find(s => s.userId !== (user?.uid || 'demo-user-1'))?.userPhoto || pairInfo?.user2?.photo || ''
+          name: getNickname(pairInfo?.user2?.name) || 'Kisstine',
+          photo: Object.values(statuses || {}).find(s => s.userId !== (user?.uid || 'demo-user-1'))?.userPhoto 
+            || pairInfo?.user2?.photo 
+            || letters.find(l => l.authorId && l.authorId !== (user?.uid || 'demo-user-1'))?.authorPhoto
+            || DEFAULT_PARTNER_PHOTO
         }}
         partnerPresence={partnerPresence}
         onStartCall={handleStartCall}
@@ -1532,7 +1540,10 @@ export default function App() {
         onDeleteMessage={handleDeleteChatMessage}
         onUpdateMessage={handleUpdateChatMessage}
         onSaveToVault={handleSaveBucketItem}
-        onOpenCallPrompt={() => setIsCallPromptOpen(true)}
+        onOpenCallPrompt={() => {
+          setIsMessengerOpen(false);
+          setIsCallPromptOpen(true);
+        }}
       />
 
       {/* Floating Jay Companion */}

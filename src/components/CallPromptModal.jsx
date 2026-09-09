@@ -7,7 +7,7 @@ import {
   Heart,
   ShieldCheck
 } from 'lucide-react';
-import { getNickname } from '../utils/nicknames';
+import { getNickname, DEFAULT_PARTNER_PHOTO } from '../utils/nicknames';
 import { getPresenceInfo } from '../utils/presence';
 
 export default function CallPromptModal({
@@ -19,12 +19,12 @@ export default function CallPromptModal({
 }) {
   if (!isOpen) return null;
 
-  const partnerName = getNickname(partner?.name) || 'Partner';
-  const partnerPhoto = partner?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+  const partnerName = getNickname(partner?.name) || 'Kisstine';
+  const partnerPhoto = partner?.photo || DEFAULT_PARTNER_PHOTO;
   const presenceInfo = getPresenceInfo(partnerPresence);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
       <div 
         className="relative w-full max-w-sm bg-[#FDFBF7] border-2 border-[#E2D7C7] rounded-3xl shadow-2xl overflow-hidden p-6 space-y-6 animate-scaleUp"
         onClick={(e) => e.stopPropagation()}
