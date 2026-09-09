@@ -3,7 +3,6 @@ import {
   X, 
   Send,
   Video,
-  FileText,
   Smile,
   Plus,
   Check
@@ -186,7 +185,11 @@ export default function StatusDetailModal({
                   className="w-4 h-4 sm:w-5 sm:h-5 object-contain select-none pointer-events-none" 
                 />
               ) : (
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#2D6A4F]" />
+                <img 
+                  src="/my-note-icon-green.png" 
+                  alt="My Note" 
+                  className="w-4 h-4 sm:w-5 sm:h-5 object-contain select-none pointer-events-none" 
+                />
               )}
             </div>
             <div>

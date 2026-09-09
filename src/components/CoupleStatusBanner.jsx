@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import { 
-  FileText,
   Eye, 
   ScrollText
 } from 'lucide-react';
@@ -188,8 +187,12 @@ export default function CoupleStatusBanner({
                       ? 'story-ring-glow animate-story-pulse p-[2px]'
                       : 'bg-[#EAF3EC] border border-[#D5E7DA] group-hover:border-[#2D6A4F]'
                   }`}>
-                    <div className="w-full h-full rounded-xl bg-[#EAF3EC] flex items-center justify-center text-[#2D6A4F]">
-                      <FileText className="w-4 h-4 text-[#2D6A4F]" />
+                    <div className="w-full h-full rounded-xl bg-[#EAF3EC] flex items-center justify-center">
+                      <img 
+                        src="/my-note-icon-green.png" 
+                        alt="My Note" 
+                        className="w-4 h-4 sm:w-4.5 sm:h-4.5 object-contain select-none pointer-events-none" 
+                      />
                     </div>
                   </div>
                   {myStatusSeen && !isMyStatusUnseen && (
