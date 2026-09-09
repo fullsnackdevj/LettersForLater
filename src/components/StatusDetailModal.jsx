@@ -174,8 +174,20 @@ export default function StatusDetailModal({
         {/* ── TOP HEADER ────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#EAF3EC] border border-[#D5E7DA] flex items-center justify-center text-[#2D6A4F] shadow-2xs">
-              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#2D6A4F]" />
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl border flex items-center justify-center shadow-2xs ${
+              !isMine 
+                ? 'bg-[#FCE4EC] border-[#F8B4C8] text-[#C23867]' 
+                : 'bg-[#EAF3EC] border-[#D5E7DA] text-[#2D6A4F]'
+            }`}>
+              {!isMine ? (
+                <img 
+                  src="/partner-note-icon-pink.png" 
+                  alt="Partner's Note" 
+                  className="w-4 h-4 sm:w-5 sm:h-5 object-contain select-none pointer-events-none" 
+                />
+              ) : (
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#2D6A4F]" />
+              )}
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-stone-900 leading-tight">
@@ -230,7 +242,11 @@ export default function StatusDetailModal({
             <div className="flex-1 min-w-0">
               {/* Note Bubble with Edge Reaction Trigger & Left-Anchored Popup Bar */}
               <div className="relative mb-2.5">
-                <div className="bg-[#EAF3EC] text-[#1E3A2B] rounded-2xl rounded-tl-sm px-4 py-3 border border-[#D5E7DA] shadow-2xs">
+                <div className={`rounded-2xl rounded-tl-sm px-4 py-3 border shadow-2xs ${
+                  !isMine 
+                    ? 'bg-[#FFF0F4] text-[#701A35] border-[#F8B4C8]' 
+                    : 'bg-[#EAF3EC] text-[#1E3A2B] border-[#D5E7DA]'
+                }`}>
                   <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words font-normal">
                     {targetStatus.customNote || targetStatus.statusText || 'No note added'}
                   </p>

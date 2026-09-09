@@ -81,15 +81,15 @@ export default function CoupleStatusBanner({
           {/* ─────────────────────────────────────────────────────────────
               CARD 1: PARTNER'S LIVE NOTE (PEEK CAROUSEL)
              ───────────────────────────────────────────────────────────── */}
-          <div className="w-[86%] sm:w-[90%] md:w-[92%] shrink-0 snap-start">
+          <div className="w-[70%] sm:w-[47%] md:w-[340px] shrink-0 snap-start">
             <div 
               onClick={() => {
                 if (partnerStatus) onOpenStatusDetail(partnerStatus);
               }}
-              className={`w-full bg-white/95 hover:bg-white border rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2.5 cursor-pointer group ${
+              className={`w-full border rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2.5 cursor-pointer group ${
                 isPartnerStatusUnseen 
-                  ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/70 bg-gradient-to-r from-[#FFFDF9] via-[#FFF9EE] to-[#FFF5F5]'
-                  : 'border-[#D2C3B0] hover:border-[#A83232]'
+                  ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/70 bg-gradient-to-r from-[#FFF5F8] via-[#FFE8F0] to-[#FFF0F5]'
+                  : 'bg-[#FFF0F4]/95 hover:bg-[#FFE8F0] border-[#F8B4C8] hover:border-[#E892A8]'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -99,10 +99,14 @@ export default function CoupleStatusBanner({
                   <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform ${
                     isPartnerStatusUnseen
                       ? 'story-ring-glow animate-story-pulse p-[2px]'
-                      : 'bg-[#EAF3EC] border border-[#D5E7DA]'
+                      : 'bg-[#FCE4EC] border border-[#F8B4C8]'
                   }`}>
-                    <div className="w-full h-full rounded-xl bg-[#EAF3EC] flex items-center justify-center text-[#2D6A4F]">
-                      <FileText className="w-4 h-4 text-[#2D6A4F]" />
+                    <div className="w-full h-full rounded-xl bg-[#FCE4EC] flex items-center justify-center">
+                      <img 
+                        src="/partner-note-icon-pink.png" 
+                        alt="Partner's Note" 
+                        className="w-4 h-4 sm:w-4.5 sm:h-4.5 object-contain select-none pointer-events-none" 
+                      />
                     </div>
                   </div>
                   {partnerSeen && !isPartnerStatusUnseen && (
@@ -163,7 +167,7 @@ export default function CoupleStatusBanner({
           {/* ─────────────────────────────────────────────────────────────
               CARD 2: YOUR LIVE NOTE (PEEK CAROUSEL)
              ───────────────────────────────────────────────────────────── */}
-          <div className="w-[86%] sm:w-[90%] md:w-[92%] shrink-0 snap-start">
+          <div className="w-[70%] sm:w-[47%] md:w-[340px] shrink-0 snap-start">
             <div 
               onClick={() => {
                 if (myStatus) onOpenStatusDetail(myStatus);
@@ -241,7 +245,7 @@ export default function CoupleStatusBanner({
               CARD 3: PAST NOTES HISTORY SHORTCUT (CAROUSEL SLIDE)
              ───────────────────────────────────────────────────────────── */}
           {onOpenStatusHistory && (
-            <div className="w-[68%] sm:w-[50%] md:w-[35%] shrink-0 snap-start">
+            <div className="w-[56%] sm:w-[36%] md:w-[240px] shrink-0 snap-start">
               <div 
                 onClick={onOpenStatusHistory}
                 className="w-full bg-white/95 hover:bg-white border border-dashed border-[#D2C3B0] hover:border-[#A83232] rounded-2xl p-2 sm:p-2.5 shadow-xs transition-all flex items-center justify-between gap-2 cursor-pointer group"

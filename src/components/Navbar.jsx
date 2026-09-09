@@ -121,7 +121,7 @@ export default function Navbar({
         
         {/* Brand & Logo */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="wax-seal w-9 h-9 sm:w-10 sm:h-10 text-base sm:text-lg font-serif font-bold cursor-pointer hover:scale-105 transition-transform shrink-0">
+          <div className="wax-seal w-[50px] h-[50px] sm:w-[52px] sm:h-[52px] text-lg sm:text-xl font-serif font-bold cursor-pointer hover:scale-105 transition-transform shrink-0 shadow-md">
             L
           </div>
           <div className="hidden md:block">
@@ -138,7 +138,7 @@ export default function Navbar({
             OUR STORIES NAVBAR HUB (Avatars + Add Story + Memory Log + Call + Messenger)
            ───────────────────────────────────────────────────────────── */}
         {user && (
-          <div className="flex items-center gap-2 sm:gap-3.5 bg-[#FAF5EC] border border-[#D2C3B0]/70 py-1 sm:py-1.5 px-2.5 sm:px-3.5 rounded-full shadow-xs">
+          <div className="h-[50px] sm:h-[52px] flex items-center gap-2 sm:gap-3.5 bg-[#FAF5EC] border border-[#D2C3B0]/70 px-2.5 sm:px-3.5 rounded-full shadow-xs">
             
             {/* Story Hub Title Label (Desktop) */}
             <div className="hidden xl:flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#A83232] pr-1.5 border-r border-[#D2C3B0]/60">
@@ -405,7 +405,7 @@ export default function Navbar({
               <button
                 type="button"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center border transition-all shadow-xs cursor-pointer touch-manipulation active:scale-95 ${
+                className={`w-[50px] h-[50px] sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center border transition-all shadow-xs cursor-pointer touch-manipulation active:scale-95 ${
                   isProfileOpen
                     ? 'bg-[#A83232] text-[#F8E3B6] border-[#D4AF37]/60 shadow-md'
                     : 'bg-[#FAF5EC] hover:bg-[#EFE9DE] border-[#D2C3B0] text-[#36271C] hover:scale-105'
@@ -414,9 +414,9 @@ export default function Navbar({
                 aria-label="Toggle navigation menu"
               >
                 {isProfileOpen ? (
-                  <X className="w-4 h-4 text-[#F8E3B6]" />
+                  <X className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-[#F8E3B6]" />
                 ) : (
-                  <Menu className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#36271C]" />
+                  <Menu className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-[#36271C]" />
                 )}
               </button>
 
