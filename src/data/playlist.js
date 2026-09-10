@@ -36,5 +36,29 @@ export const DEFAULT_PLAYLIST = [
     title: 'Celeste',
     artist: 'Tothapi',
     src: '/songs/Tothapi - Celeste (Official Lyric Video).mp3'
+  },
+  {
+    id: 'cant-help-falling-in-love',
+    title: "Can't Help Falling In Love",
+    artist: 'Dave Fenley (Elvis Presley Cover)',
+    src: "/songs/Dave Fenley - Can't Help Falling In Love by Elvis Presley (Cover) - Dave Fenley (128k).mp3"
+  },
+  {
+    id: 'i-will-always-love-you',
+    title: 'I Will Always Love You',
+    artist: 'Dave Fenley (Dolly Parton Cover)',
+    src: '/songs/Dave Fenley - I Will Always Love You by Dolly Parton (Cover) - Dave Fenley (128k).mp3'
+  },
+  {
+    id: 'nothings-gonna-change-my-love',
+    title: "Nothing's Gonna Change My Love For You",
+    artist: 'Harold Lumandaz (George Benson Cover)',
+    src: "/songs/Nothing's Gonna Change My Love For - George Benson  Harold Lumandaz (Acoustic Cover).mp3"
+  },
+  {
+    id: 'ordinary-song',
+    title: 'Ordinary Song',
+    artist: 'Marc Velasco (Neyosi Acoustic Cover)',
+    src: '/songs/Ordinary Song - Marc Velasco (Acoustic Cover _ Neyosi) [iUcCGQB055M].mp3'
   }
 ];
