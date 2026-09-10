@@ -521,9 +521,29 @@ export default function MessengerModal({
       });
       streamRef.current = stream;
 
-      const mediaRecorder = new MediaRecorder(stream);
+      // Detect the best supported mimeType for this browser
+      const preferredTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+      ];
+      let selectedMimeType = '';
+      for (const mType of preferredTypes) {
+        if (MediaRecorder.isTypeSupported(mType)) {
+          selectedMimeType = mType;
+          break;
+        }
+      }
+
+      const recorderOptions = selectedMimeType ? { mimeType: selectedMimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+
+      // Track the actual mimeType the recorder is using
+      mediaRecorderRef.current._actualMimeType = mediaRecorder.mimeType || selectedMimeType || 'audio/webm';
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -531,7 +551,33 @@ export default function MessengerModal({
         }
       };
 
-      mediaRecorder.start(200);
+      // Assign onstop BEFORE calling start() to avoid race conditions
+      mediaRecorder.onstop = () => {
+        // onstop fires after the final ondataavailable, so all chunks are ready
+        const shouldSendAudio = mediaRecorderRef.current?._shouldSendOnStop;
+        const capturedDuration = mediaRecorderRef.current?._capturedDuration || 0;
+        const actualMime = mediaRecorderRef.current?._actualMimeType || 'audio/webm';
+
+        if (shouldSendAudio && audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            await handleSend({
+              text: '',
+              audioBlob,
+              audioDataUrl: reader.result,
+              durationSec: capturedDuration
+            });
+          };
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
+      };
+
+      mediaRecorder.start(); // No timeslice — collect all data in one chunk for maximum compatibility
       setIsRecording(true);
       setRecordingSeconds(0);
 
@@ -553,28 +599,11 @@ export default function MessengerModal({
   // Stop audio recording
   const handleStopRecording = async (shouldSend = false) => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    const duration = recordingSeconds;
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.onstop = async () => {
-        if (shouldSend && audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = async () => {
-            await handleSend({
-              text: '',
-              audioBlob,
-              audioDataUrl: reader.result,
-              durationSec: duration
-            });
-          };
-        }
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(t => t.stop());
-          streamRef.current = null;
-        }
-      };
+      // Store flags on the recorder so the pre-assigned onstop handler can read them
+      mediaRecorderRef.current._shouldSendOnStop = shouldSend;
+      mediaRecorderRef.current._capturedDuration = recordingSeconds;
 
       try {
         mediaRecorderRef.current.stop();

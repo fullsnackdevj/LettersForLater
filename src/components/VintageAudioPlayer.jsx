@@ -144,6 +144,8 @@ export default function VintageAudioPlayer({
       <audio
         ref={audioRef}
         src={audioUrl}
+        crossOrigin="anonymous"
+        preload="auto"
         onTimeUpdate={() => {
           if (audioRef.current) {
             setCurrentTime(audioRef.current.currentTime);
@@ -166,6 +168,9 @@ export default function VintageAudioPlayer({
         onEnded={() => {
           setIsPlaying(false);
           setCurrentTime(0);
+        }}
+        onError={(e) => {
+          console.error('Audio playback error:', e.target?.error?.message || e);
         }}
         className="hidden"
       />
