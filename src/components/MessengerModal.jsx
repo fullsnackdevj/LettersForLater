@@ -19,7 +19,8 @@ import {
   Edit3,
   Copy,
   MoreHorizontal,
-  PhoneOff
+  PhoneOff,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import html2canvas from 'html2canvas';
@@ -145,6 +146,137 @@ const getEmojiRenderSize = (text) => {
   if (emojiArray.length === 1 || trimmed.length <= 4) return 'text-5xl';
   if (emojiArray.length <= 3) return 'text-3xl';
   return null;
+};
+
+// URL detection regex matching standard http(s) protocols, www prefixes, and web domains
+const URL_REGEX_PATTERN = /(?:https?:\/\/|www\.)[^\s<]+|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|edu|gov|io|ph|co|me|app|dev|link|site|tv|be|to|fm|ai|ly)(?::\d+)?(?:\/[^\s<]*)?/gi;
+
+// Safely format URL ensuring valid http/https protocol
+const getSafeHref = (url) => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
+
+// Clean trailing sentence punctuation from matched URLs (e.g. "Visit https://example.com,")
+const parseUrlAndTrailing = (rawUrl) => {
+  if (!rawUrl) return { url: '', trailing: '' };
+  let url = rawUrl;
+  let trailing = '';
+
+  while (url.length > 0) {
+    const lastChar = url[url.length - 1];
+    if (['.', ',', '!', '?', ';', ':', '"', "'", '`', '>', '<'].includes(lastChar)) {
+      trailing = lastChar + trailing;
+      url = url.slice(0, -1);
+    } else if (lastChar === ')') {
+      const openCount = (url.match(/\(/g) || []).length;
+      const closeCount = (url.match(/\)/g) || []).length;
+      if (closeCount > openCount) {
+        trailing = lastChar + trailing;
+        url = url.slice(0, -1);
+      } else {
+        break;
+      }
+    } else if (lastChar === ']') {
+      const openCount = (url.match(/\[/g) || []).length;
+      const closeCount = (url.match(/\]/g) || []).length;
+      if (closeCount > openCount) {
+        trailing = lastChar + trailing;
+        url = url.slice(0, -1);
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return { url, trailing };
+};
+
+// Extract clean, unique URLs from text
+const extractUrls = (text) => {
+  if (!text || typeof text !== 'string') return [];
+  const regex = new RegExp(URL_REGEX_PATTERN);
+  const urls = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const { url } = parseUrlAndTrailing(match[0]);
+    if (url) {
+      const safe = getSafeHref(url);
+      if (!urls.includes(safe)) {
+        urls.push(safe);
+      }
+    }
+  }
+  return urls;
+};
+
+// Extract user-friendly domain name for badges (e.g. "youtube.com", "open.spotify.com")
+const getDomainFromUrl = (urlStr) => {
+  if (!urlStr) return 'Link';
+  try {
+    const href = getSafeHref(urlStr);
+    const parsed = new URL(href);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return urlStr.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0] || 'Link';
+  }
+};
+
+// Render text with clickable, interactive, safe links
+const renderMessageWithLinks = (text) => {
+  if (!text || typeof text !== 'string') return text;
+
+  const regex = new RegExp(URL_REGEX_PATTERN);
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchedStart = match.index;
+    const rawMatch = match[0];
+
+    if (matchedStart > lastIndex) {
+      parts.push(text.substring(lastIndex, matchedStart));
+    }
+
+    const { url, trailing } = parseUrlAndTrailing(rawMatch);
+    if (url) {
+      const href = getSafeHref(url);
+      parts.push(
+        <a
+          key={`link-${matchedStart}-${url}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className="inline font-semibold text-[#A83232] hover:text-[#8B0000] underline decoration-[#D4AF37] hover:decoration-[#A83232] underline-offset-2 break-all transition-colors cursor-pointer select-text"
+          title={`Open ${href}`}
+        >
+          {url}
+          <ExternalLink className="inline-block w-3 h-3 ml-0.5 -mt-0.5 opacity-70 shrink-0" />
+        </a>
+      );
+    }
+    if (trailing) {
+      parts.push(trailing);
+    }
+
+    lastIndex = matchedStart + rawMatch.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
 };
 
 export default function MessengerModal({
@@ -328,6 +460,28 @@ export default function MessengerModal({
       target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
   }, []);
+
+  // Handle clipboard paste in chat (allows pasting copied images from clipboard as well as text/links)
+  const handlePaste = useCallback(async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type && item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          try {
+            const compressed = await compressImage(file, 1000, 1000, 0.75);
+            setAttachedImage(compressed);
+            showToast('Photo attached from clipboard 📋✨');
+          } catch (err) {
+            console.error('Error compressing pasted image:', err);
+          }
+          return;
+        }
+      }
+    }
+  }, [showToast]);
 
   // Clean up audio recorder
   useEffect(() => {
@@ -792,6 +946,7 @@ export default function MessengerModal({
             const isMenuOpen = activeReactionMenuId === msg.id;
             const standaloneEmojiClass = getEmojiRenderSize(msg.text);
             const isCallMsg = Boolean(msg.callInfo || (typeof msg.text === 'string' && (msg.text.includes('Missed video call') || msg.text.includes('Missed audio call') || msg.text.includes('Missed voice call') || msg.text.includes('Missed call'))));
+            const msgUrls = msg.text ? extractUrls(msg.text) : [];
 
             return (
               <React.Fragment key={msg.id || idx}>
@@ -882,6 +1037,20 @@ export default function MessengerModal({
                     >
                       <Bookmark className="w-3.5 h-3.5" />
                     </button>
+
+                    {/* Open Link (if message contains a link) */}
+                    {msgUrls.length > 0 && (
+                      <a
+                        href={msgUrls[0]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 hover:bg-[#EFE9DE] text-[#A83232] rounded-full transition-colors cursor-pointer"
+                        title={`Open link (${getDomainFromUrl(msgUrls[0])})`}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
 
                     {/* Copy Text */}
                     {msg.text && (
@@ -1026,11 +1195,50 @@ export default function MessengerModal({
                       </div>
                     ) : (
                       msg.text && (
-                        <p className={`leading-relaxed break-words font-medium whitespace-pre-wrap ${
-                          standaloneEmojiClass || 'text-xs sm:text-[13px]'
-                        }`}>
-                          {msg.text}
-                        </p>
+                        <>
+                          <p className={`leading-relaxed break-words font-medium whitespace-pre-wrap select-text ${
+                            standaloneEmojiClass || 'text-xs sm:text-[13px]'
+                          }`}>
+                            {renderMessageWithLinks(msg.text)}
+                          </p>
+
+                          {/* Interactive Romantic Link Card Preview */}
+                          {msgUrls.length > 0 && (
+                            <div className="mt-2 pt-1.5 border-t border-[#D2C3B0]/40 flex flex-col gap-1.5">
+                              {msgUrls.slice(0, 2).map((urlItem, uIdx) => (
+                                <a
+                                  key={uIdx}
+                                  href={urlItem}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
+                                  className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white/85 hover:bg-white border border-[#D4AF37]/50 shadow-2xs hover:shadow-xs transition-all group/link cursor-pointer text-left"
+                                  title={`Open ${urlItem}`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-6 h-6 rounded-lg bg-[#FAF5EC] border border-[#D4AF37]/60 flex items-center justify-center shrink-0 group-hover/link:scale-105 transition-transform text-[#A83232]">
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="block text-[11px] font-bold text-[#36271C] truncate leading-tight group-hover/link:text-[#A83232]">
+                                        {getDomainFromUrl(urlItem)}
+                                      </span>
+                                      <span className="block text-[9px] text-[#9E8B75] truncate font-mono leading-tight">
+                                        {urlItem}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="px-2.5 py-1 rounded-full bg-[#A83232] group-hover/link:bg-[#8B0000] text-[#F8E3B6] text-[10px] font-bold shrink-0 shadow-2xs transition-colors flex items-center gap-1">
+                                    <span>Open</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )
                     )}
 
@@ -1326,6 +1534,7 @@ export default function MessengerModal({
                   ref={textareaRef}
                   rows={1}
                   defaultValue=""
+                  onPaste={handlePaste}
                   onChange={handleTextareaInput}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1574,6 +1783,27 @@ export default function MessengerModal({
                 <Bookmark className="w-4 h-4 text-amber-700" />
                 <span>Save to Couple Vault</span>
               </button>
+
+              {/* Open Link in Browser (if message contains links) */}
+              {activeActionSheetMessage.text && extractUrls(activeActionSheetMessage.text).map((urlItem, idx) => (
+                <a
+                  key={idx}
+                  href={urlItem}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setActiveActionSheetMessage(null)}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-white hover:bg-[#FFFDF9] text-[#A83232] text-xs font-bold border border-[#D4AF37]/60 shadow-2xs transition-all active:scale-98 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <ExternalLink className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                    <span className="truncate">Open {getDomainFromUrl(urlItem)}</span>
+                  </div>
+                  <span className="text-[10px] bg-[#A83232]/10 text-[#A83232] px-2.5 py-0.5 rounded-full shrink-0 font-bold flex items-center gap-1">
+                    <span>Visit</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </span>
+                </a>
+              ))}
 
               {/* Copy Text (if text exists) */}
               {activeActionSheetMessage.text && (

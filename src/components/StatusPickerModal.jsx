@@ -15,19 +15,24 @@ export default function StatusPickerModal({
   currentUser,
   onSaveStatus
 }) {
-  const [noteText, setNoteText] = useState(() => currentStatus?.customNote || currentStatus?.statusText || '');
+  const [noteText, setNoteText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef(null);
 
-  // Auto-focus input when modal opens
+  // Auto-focus input and ensure clean slate (clear past notes) when modal opens
   useEffect(() => {
     if (isOpen) {
-      setNoteText(currentStatus?.customNote || currentStatus?.statusText || '');
+      setNoteText('');
       setTimeout(() => {
         inputRef.current?.focus();
       }, 150);
     }
-  }, [isOpen, currentStatus]);
+  }, [isOpen]);
+
+  const handleClose = () => {
+    setNoteText('');
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -48,6 +53,7 @@ export default function StatusPickerModal({
         emoji: detectedEmoji || '',
         category: 'daily'
       });
+      setNoteText('');
       setIsSaving(false);
       onClose();
     } catch (err) {
@@ -59,7 +65,7 @@ export default function StatusPickerModal({
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div 
         className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-5 sm:p-6 animate-scaleIn border border-stone-100 my-auto"
@@ -70,7 +76,7 @@ export default function StatusPickerModal({
         <div className="flex items-center justify-between mb-5 sm:mb-6">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 rounded-full text-stone-700 hover:text-stone-900 transition-colors cursor-pointer"
             title="Cancel"
           >
