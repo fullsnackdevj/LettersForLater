@@ -375,8 +375,12 @@ export async function startOutgoingCall({
     const receiverCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'receiverCandidates');
 
     // Purge any stale candidates from past sessions to ensure a clean start
-    purgeOldCandidates(callerCandidatesCol);
-    purgeOldCandidates(receiverCandidatesCol);
+    // IMPORTANT: Await both purges so they complete BEFORE we start generating
+    // new ICE candidates. Without await, the purge runs concurrently and can
+    // delete freshly generated candidates from the current call session,
+    // breaking the peer-to-peer media connection entirely (black screen bug).
+    await purgeOldCandidates(callerCandidatesCol);
+    await purgeOldCandidates(receiverCandidatesCol);
 
     // Collect ICE candidates and push to Firestore with callSessionId
     pc.onicecandidate = (event) => {
@@ -566,6 +570,10 @@ export async function acceptIncomingCall({
     const callDocRef = doc(db, 'pairs', cleanCode, 'calls', 'active');
     const callerCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'callerCandidates');
     const receiverCandidatesCol = collection(db, 'pairs', cleanCode, 'calls', 'active', 'receiverCandidates');
+
+    // Purge stale receiver candidates from prior sessions before we start
+    // generating fresh ones for the current call.
+    await purgeOldCandidates(receiverCandidatesCol);
 
     // Collect ICE candidates and push to Firestore with callSessionId
     pc.onicecandidate = (event) => {
