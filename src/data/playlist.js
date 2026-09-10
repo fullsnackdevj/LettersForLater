@@ -60,5 +60,29 @@ export const DEFAULT_PLAYLIST = [
     title: 'Ordinary Song',
     artist: 'Marc Velasco (Neyosi Acoustic Cover)',
     src: '/songs/Ordinary Song - Marc Velasco (Acoustic Cover _ Neyosi) [iUcCGQB055M].mp3'
+  },
+  {
+    id: 'come-what-may',
+    title: 'Come What May',
+    artist: 'Justin Vasquez (Cover)',
+    src: '/songs/Come what may x cover by Justin Vasquez - Justin Vasquez (128k).mp3'
+  },
+  {
+    id: 'i-could-not-ask-for-more',
+    title: 'I Could Not Ask for More',
+    artist: 'Francis Greg (Edwin McCain Cover)',
+    src: '/songs/I Could Not Ask for More - Edwin McCain (Acoustic Cover by Francis Greg) - francis greg (128k).mp3'
+  },
+  {
+    id: 'right-here-waiting',
+    title: 'Right Here Waiting',
+    artist: 'Jonah Baker & Celine (Richard Marx Cover)',
+    src: '/songs/Right Here Waiting by Richard Marx (Acoustic Cover by Jonah Baker and Celine) - Jonah Baker (128k).mp3'
+  },
+  {
+    id: 'sa-bawat-sandali',
+    title: 'Sa Bawat Sandali',
+    artist: 'Amiel Sol (Jhino Bilbao Acoustic Cover)',
+    src: '/songs/Sa Bawat Sandali - Amiel Sol [Jhino Bilbao Cover] (Acoustic Live).mp3'
   }
 ];

@@ -11,23 +11,44 @@ import {
   SkipForward,
   ListMusic,
   Check,
-  Radio
+  Radio,
+  Shuffle
 } from 'lucide-react';
 import { DEFAULT_PLAYLIST } from '../data/playlist';
+
+/**
+ * Fisher-Yates shuffle generator.
+ * Produces an array of randomized track indices from 0 to length - 1.
+ * If avoidFirstIndex is provided, guarantees the first item of the new queue
+ * is not avoidFirstIndex (preventing back-to-back repeats when reshuffling).
+ */
+function createShuffledQueue(length, avoidFirstIndex = null) {
+  if (length <= 1) return [0];
+  const indices = Array.from({ length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  if (avoidFirstIndex !== null && indices[0] === avoidFirstIndex && indices.length > 1) {
+    const swapIdx = 1 + Math.floor(Math.random() * (indices.length - 1));
+    [indices[0], indices[swapIdx]] = [indices[swapIdx], indices[0]];
+  }
+  return indices;
+}
 
 export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive = false }) {
   const audioRef = useRef(null);
   const wasPlayingBeforeCallRef = useRef(false);
   
-  // Track Index with LocalStorage Persistence
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(() => {
-    try {
-      const saved = localStorage.getItem('lettersforlater_music_index');
-      const idx = parseInt(saved, 10);
-      return !isNaN(idx) && idx >= 0 && idx < playlist.length ? idx : 0;
-    } catch {
-      return 0;
-    }
+  // Shuffle Playback Queue:
+  // Starts with a random song ahead on login/open, and plays every song once before repeating
+  const [playbackState, setPlaybackState] = useState(() => {
+    const queue = createShuffledQueue(playlist.length);
+    return {
+      queue,
+      index: 0,
+      cycle: 1
+    };
   });
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,6 +63,9 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
     }
   });
 
+  // Track index derived from the shuffle queue
+  const currentTrackIndex = playbackState.queue[playbackState.index] ?? 0;
+
   const currentTrack = playlist[currentTrackIndex] || playlist[0] || {
     id: 'default',
     title: 'Background Music',
@@ -49,12 +73,19 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
     src: ''
   };
 
-  // Sync track index to localStorage
+  // Re-sync shuffle queue if playlist length changes
   useEffect(() => {
-    try {
-      localStorage.setItem('lettersforlater_music_index', currentTrackIndex.toString());
-    } catch {}
-  }, [currentTrackIndex]);
+    setPlaybackState(prev => {
+      if (prev.queue.length !== playlist.length) {
+        return {
+          queue: createShuffledQueue(playlist.length),
+          index: 0,
+          cycle: 1
+        };
+      }
+      return prev;
+    });
+  }, [playlist.length]);
 
   // Auto-pause music during an active call, resume when call ends
   useEffect(() => {
@@ -152,7 +183,9 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
     setIsMuted(nextMuted);
   };
 
-  // Switch to Next Song
+  // Switch to Next Song:
+  // Advances through the shuffled queue. Only when all songs have been played once
+  // does a new shuffled cycle begin (avoiding back-to-back repeats).
   const handleNextTrack = () => {
     if (playlist.length <= 1) {
       if (audioRef.current) {
@@ -161,10 +194,27 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
       }
       return;
     }
-    setCurrentTrackIndex(prev => (prev + 1) % playlist.length);
+
+    setPlaybackState(prev => {
+      if (prev.index + 1 < prev.queue.length) {
+        return {
+          ...prev,
+          index: prev.index + 1
+        };
+      } else {
+        // Entire playlist was played once! Generate new shuffle for next cycle
+        const lastPlayedIndex = prev.queue[prev.index];
+        const nextQueue = createShuffledQueue(playlist.length, lastPlayedIndex);
+        return {
+          queue: nextQueue,
+          index: 0,
+          cycle: prev.cycle + 1
+        };
+      }
+    });
   };
 
-  // Switch to Previous Song
+  // Switch to Previous Song in the queue
   const handlePrevTrack = () => {
     if (playlist.length <= 1) {
       if (audioRef.current) {
@@ -173,13 +223,58 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
       }
       return;
     }
-    setCurrentTrackIndex(prev => (prev - 1 + playlist.length) % playlist.length);
+
+    // If song has played for more than 3 seconds, restart the song
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+      return;
+    }
+
+    setPlaybackState(prev => {
+      if (prev.index > 0) {
+        return {
+          ...prev,
+          index: prev.index - 1
+        };
+      }
+      return {
+        ...prev,
+        index: prev.queue.length - 1
+      };
+    });
   };
 
-  // Select Specific Song from Playlist
-  const handleSelectTrack = (index) => {
-    setCurrentTrackIndex(index);
+  // Select Specific Song from Playlist:
+  // Plays the selected track immediately while keeping the rest of unplayed songs intact
+  const handleSelectTrack = (targetIndex) => {
     setIsPlaylistOpen(false);
+
+    setPlaybackState(prev => {
+      const currentTrackIdx = prev.queue[prev.index];
+      if (currentTrackIdx === targetIndex) {
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(() => {});
+        }
+        return prev;
+      }
+
+      const newQueue = [...prev.queue];
+      const targetPos = newQueue.indexOf(targetIndex);
+
+      if (targetPos !== -1) {
+        // Swap target into the current playback index
+        [newQueue[prev.index], newQueue[targetPos]] = [newQueue[targetPos], newQueue[prev.index]];
+      } else {
+        newQueue[prev.index] = targetIndex;
+      }
+
+      return {
+        ...prev,
+        queue: newQueue
+      };
+    });
   };
 
   return (
@@ -334,9 +429,15 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
                       <Radio className="w-3.5 h-3.5 text-[#D4AF37]" />
                       <span>Our Soundtrack</span>
                     </div>
-                    <span className="text-[10px] text-[#F3E5AB]/70 font-mono">
-                      {playlist.length} {playlist.length === 1 ? 'Song' : 'Songs'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1 text-[9px] text-[#D4AF37] font-mono bg-[#D4AF37]/15 px-1.5 py-0.5 rounded border border-[#D4AF37]/30" title="Song in current shuffle round">
+                        <Shuffle className="w-2.5 h-2.5" />
+                        <span>{playbackState.index + 1}/{playbackState.queue.length}</span>
+                      </span>
+                      <span className="text-[10px] text-[#F3E5AB]/70 font-mono">
+                        {playlist.length} {playlist.length === 1 ? 'Song' : 'Songs'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
@@ -356,8 +457,8 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                               isCurrent 
-                                ? 'bg-[#D4AF37] text-[#3D2600]' 
-                                : 'bg-black/40 text-white/60'
+                              ? 'bg-[#D4AF37] text-[#3D2600]' 
+                              : 'bg-black/40 text-white/60'
                             }`}>
                               {isCurrent && isPlaying ? (
                                 <Disc className="w-3.5 h-3.5 animate-spinVinyl text-[#3D2600]" />
@@ -386,8 +487,14 @@ export default function MusicPlayer({ playlist = DEFAULT_PLAYLIST, isCallActive 
                     })}
                   </div>
 
-                  <div className="pt-1 border-t border-white/10 text-[10px] text-center text-white/50 font-handwriting text-sm">
-                    Drop more songs in <code className="text-[#D4AF37] font-mono text-[9px]">public/songs/</code> anytime!
+                  <div className="pt-1.5 border-t border-white/10 text-center space-y-0.5">
+                    <div className="text-[10px] text-[#D4AF37] flex items-center justify-center gap-1 font-medium">
+                      <Shuffle className="w-2.5 h-2.5" />
+                      <span>Plays each song once before repeating</span>
+                    </div>
+                    <div className="text-[9px] text-white/40 font-handwriting">
+                      Drop more songs in <code className="text-[#D4AF37]/80 font-mono text-[8.5px]">public/songs/</code> anytime!
+                    </div>
                   </div>
                 </div>
               </>
